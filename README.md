@@ -15,7 +15,7 @@ Clawd, the Claude Code mascot, above the prompt. It reacts to what Claude is doi
 In a Claude Code terminal session:
 
 ```
-/plugin install clawd-buddy --marketplace <owner>/<repo>
+/plugin install clawd-buddy --marketplace zGreenCat/pet-claudy
 ```
 
 Answer `y` to add the marketplace, then pick a scope (user, to have it in every session).
