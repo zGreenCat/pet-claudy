@@ -1,0 +1,6 @@
+{
+  "name": "varay-mods",
+  "owner": { "name": "varay" },
+  "description": "varay's Claude Code mods",
+  "plugins": [{ "name": "clawd-buddy", "source": "./" }]
+}

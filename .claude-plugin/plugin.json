@@ -1,0 +1,7 @@
+{
+  "name": "clawd-buddy",
+  "version": "0.5.4",
+  "description": "Clawd, the Claude Code mascot, dancing above the prompt, with a small buddy at a laptop for each subagent, saying what it is doing",
+  "author": { "name": "varay" },
+  "types": "./types/index.d.ts"
+}
