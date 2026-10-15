@@ -5,7 +5,7 @@
 import type { Mark } from './desks'
 
 export const TICK_MS = 250
-export const WIDTH = 9
+export const WIDTH = 8
 // After this long idle Clawd falls asleep and stops animating
 export const SLEEP_AFTER_TICKS = (3 * 60 * 1000) / TICK_MS
 // Idle this long, Clawd takes a smoke break now and then: the last
@@ -14,30 +14,35 @@ const SMOKE_FROM_TICKS = 60
 const SMOKE_EVERY = 240
 const SMOKE_TICKS = 40
 
-// Clawd: three rows, each WIDTH cells. Painted with the cell's background
+// Clawd as the Claude Code logo draws it: a square body, an eye in each upper
+// corner, short arms at the chest and two pairs of legs at its sides. Three
+// rows, each WIDTH cells; the body is painted with the cell's background
 // rather than block glyphs, which leave a dark seam between rows in fonts
-// whose glyphs don't fill the line height.
+// whose glyphs don't fill the line height. Only the thin parts (arms, legs)
+// are glyphs, half a cell or a quarter.
 //   O  orange cell
-//   E  orange cell with a dark eye in its lower half (▄: a square eye, face above)
+//   L  orange cell, a dark eye in its lower left quarter; R the lower right
 //   -  orange cell with a closed eye (▁)
+//   ^  an arm at rest, the cell's upper half; v an arm raised, its lower half
+//   a  a leg in the cell's upper left quarter; b the upper right
 //   .  empty
 // What it holds runs on past WIDTH: h a pan's handle, P the pan, c a
 // cigarette, C its ember, Y the ember drawn on.
-const HEAD = '.OEOOOEO.'
-const HEAD_BLINK = '.O-OOO-O.'
-const HEAD_ARMS_UP = 'OOEOOOEOO'
-const BODY = 'OOOOOOOOO'
-const BODY_ARMS_UP = '.OOOOOOO.'
-const LEGS = '.O.O.O.O.'
-const LEGS_STEP = 'O..O.O..O'
-const LEGS_HOP = '.........'
+const HEAD = '.OLOORO.'
+const HEAD_BLINK = '.O-OO-O.'
+const HEAD_ARMS_UP = 'vOLOOROv'
+const BODY = '^OOOOOO^'
+const BODY_ARMS_UP = '.OOOOOO.'
+const LEGS = '.aa..bb.'
+const LEGS_STEP = 'a.a..b.b'
+const LEGS_HOP = '........'
 // An arm out to a pan
-const BODY_PAN = 'OOOOOOOOOOhhPPPP'
+const BODY_PAN = '^OOOOOOOhhPPPP'
 // A thin cigarette at the mouth, its ember dim, then drawn on with the eyes shut
-const HEAD_SMOKE = '.OEOOOEOcccC'
-const HEAD_DRAW = '.O-OOO-OcccY'
+const HEAD_SMOKE = '.OLOOROcccC'
+const HEAD_DRAW = '.O-OO-OcccY'
 // Cheering: arms up, eyes shut with joy
-const HEAD_CHEER = 'OO-OOO-OO'
+const HEAD_CHEER = 'vO-OO-Ov'
 
 export type Frame = [string, string, string]
 
@@ -62,10 +67,10 @@ const SMOKE_COLOR = '#B8BCC4'
 const TOSS = [2, 2, 1, 0, 0, 1, 2, 2]
 // A puff's way up from the ember, a cell or two to the right each step
 const PUFF: Mark[] = [
-  { row: 1, x: 13, text: '·', fg: SMOKE_COLOR },
-  { row: 0, x: 12, text: '∘', fg: SMOKE_COLOR },
-  { row: 0, x: 13, text: 'o', fg: SMOKE_COLOR },
-  { row: 0, x: 15, text: '°', fg: SMOKE_COLOR },
+  { row: 1, x: 12, text: '·', fg: SMOKE_COLOR },
+  { row: 0, x: 11, text: '∘', fg: SMOKE_COLOR },
+  { row: 0, x: 12, text: 'o', fg: SMOKE_COLOR },
+  { row: 0, x: 14, text: '°', fg: SMOKE_COLOR },
 ]
 
 const WORKING_LINES = ['pensando', 'trabajando', 'bailando', 'cocinando código']
@@ -85,8 +90,8 @@ export type View = { frame: Frame; marks: Mark[]; x: number; line: string; isWor
 function cooking(t: number): { frame: Frame; marks: Mark[] } {
   const row = TOSS[t % TOSS.length]!
   const food = FOOD[Math.floor(t / TOSS.length) % FOOD.length]!
-  const marks: Mark[] = [{ row, x: 13, text: food, fg: FOOD_COLOR, ...(row === 2 ? { bg: PAN_COLOR } : {}) }]
-  if (row === 2) marks.push({ row: 1, x: t % 2 ? 12 : 15, text: '~', fg: SMOKE_COLOR })
+  const marks: Mark[] = [{ row, x: 11, text: food, fg: FOOD_COLOR, ...(row === 2 ? { bg: PAN_COLOR } : {}) }]
+  if (row === 2) marks.push({ row: 1, x: t % 2 ? 10 : 13, text: '~', fg: SMOKE_COLOR })
   return { frame: COOK, marks }
 }
 
@@ -110,7 +115,7 @@ function celebrating(since: number): { frame: Frame; marks: Mark[]; line: string
   if (isSettling) return { frame: IDLE, marks: [], line: '✓ listo' }
   const marks: Mark[] = [
     { row: 0, x: 0, text: isUp ? '✦' : '+', fg: SPARKLE },
-    { row: 0, x: 8, text: isUp ? '+' : '✦', fg: SPARKLE },
+    { row: 0, x: 7, text: isUp ? '+' : '✦', fg: SPARKLE },
   ]
   // Each piece falls one row a tick and starts over from above the band
   CONFETTI.forEach((c, k) => {

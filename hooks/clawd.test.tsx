@@ -72,7 +72,7 @@ test('Clawd draws above the prompt, idle and working', async $ => {
     for (const isWorking of [false, true]) {
       const ui = await $.ui.mount({ plugin: 'clawd-buddy', surface, ...band(isWorking) })
       // The eyes: dark cells on Clawd's orange
-      expect(await ui.find({ type: 'Text', text: /▄/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /[▖▗]/ })).toBeDefined()
       await ui.unmount()
     }
   }
@@ -89,16 +89,25 @@ test('Clawd steps aside for a survey', async ($, on) => {
     component: 'AbovePrompt',
     props: { hasSurvey: true, isWorking: false, maxRows: 10, bodyColumns: 80, scroll: { offset: 0, bodyRows: 10 }, view: {} },
   })
-  expect(await ui.find({ type: 'Text', text: /▄/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /[▖▗]/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: 'survey' })).toBeDefined()
   await ui.unmount()
 })
 
 test('a subagent sits down at its desk beside Clawd', async ($, on) => {
-  // Nothing beneath the plugin answers the classic events in a test
-  on('classic.SubagentStart', () => ({}))
+  // Nothing beneath the plugin answers these events in a test
+  on('agent.spawn', () => ({ model: 'haiku', agentId: 'a1' }))
   on('classic.SubagentStop', () => ({}))
-  await $.classic.SubagentStart({ agent_id: 'a1', agent_type: 'Explore' })
+  await $.agent.spawn({
+    tool_use_id: 'toolu_1',
+    prompt: 'buscar auth',
+    description: 'buscar auth',
+    subagentType: 'Explore',
+    provider: { plugin: 'engine', tier: 'core' },
+    parentModel: 'opus',
+    background: false,
+    fork: false,
+  })
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'clawd-buddy', surface, ...band(true) })
     expect(await ui.find({ type: 'Text', text: 'dirigiendo' })).toBeDefined()

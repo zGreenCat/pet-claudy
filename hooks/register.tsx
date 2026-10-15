@@ -15,6 +15,8 @@ const tick = atom({ plugin: 'clawd-buddy', key: 'tick' } as const, 0 as Tick)
 const ENDED: Partial<Record<AgentStatus, string>> = { completed: 'listo', failed: '✗ falló', killed: '✗ detenido' }
 // Ticks between checks of the agent list, and how old an agent must be to be checked
 const RECONCILE_TICKS = 8
+// Failed ticks before Clawd says so, once a session: one alone is let pass
+const FAILURES_TO_REPORT = 5
 
 export const register: Register = on => {
   // Module state: the clock, and what the last draw saw of the band
@@ -27,6 +29,7 @@ export const register: Register = on => {
   let finishedAt = -CELEBRATE_TICKS
   // The subagents at their desks, in seat order
   let agents: Agent[] = []
+  let failures = 0
 
   const isBusy = () => isWorking || agents.some(a => a.doneAt === undefined)
 
@@ -49,9 +52,6 @@ export const register: Register = on => {
   function seat(id: string, type: string, task: string) {
     if (!agents.some(a => a.id === id)) {
       agents = [...agents, { id, type, activity: task, x: START_X, bornAt: t }]
-    } else if (task) {
-      // SubagentStart came first: the spawn brings the task
-      agents = agents.map(a => (a.id === id && a.activity === '' ? { ...a, activity: task } : a))
     }
   }
 
@@ -84,8 +84,13 @@ export const register: Register = on => {
           lastKey = key
           await update($, tick, n => n + 1)
         }
-      } catch {
-        // The next tick draws again
+      } catch (err) {
+        // The next tick draws again; a run of failures is said, not hidden
+        failures += 1
+        if (failures === FAILURES_TO_REPORT) {
+          const reason = err instanceof Error ? err.message : String(err)
+          $.ui.toast(`clawd-buddy: el reloj está fallando (${reason})`)
+        }
       }
     })
 
@@ -95,16 +100,13 @@ export const register: Register = on => {
   // These hooks only watch: one that fails passes the event on untouched
   // (a `next` already called replays its answer)
 
-  // A subagent sits down when it starts, its task as its first words
+  // A subagent sits down when it starts, its task as its first words. Only the
+  // spawn seats one: SubagentStart can fire for loops no agent list names
+  // (a workflow's), which the check of the list would send off as done
   on('agent.spawn', async ($, e, next) => {
     const started = await next(e)
     if (started.agentId && !e.workflow) seat(started.agentId, e.subagentType, oneLine(e.description))
     return started
-  }).catch(($, e, next) => next(e))
-
-  on('classic.SubagentStart', ($, e, next) => {
-    seat(e.agent_id, e.agent_type, '')
-    return next(e)
   }).catch(($, e, next) => next(e))
 
   // Its bubble follows its tool calls

@@ -21,7 +21,7 @@ export type Style = { bg?: string; fg?: string; dim?: boolean; italic?: boolean;
 export type Segment = { text: string; style: Style }
 
 export const ROWS = 4
-// Clawd's 9 cells and a gap
+// Clawd's 8 cells and a gap
 const DESKS_X = 11
 // A buddy at its laptop, in cells
 const SPRITE = 10
@@ -47,17 +47,18 @@ const MARK_COLORS = ['#E58FD0', '#F2C14E', '#7FD1E8']
 // Pixel colors: O Clawd, K eye, G laptop, L a lit key; . nothing
 const PIXEL: Record<string, string> = { O: 'claude', K: EYE_COLOR, G: '#6B7280', L: '#F3EFE6' }
 
-// Sprites are four pixel rows, drawn two to a cell with half blocks.
+// Sprites are four pixel rows, drawn two to a cell with half blocks: a small
+// Clawd, an eye at each side and its legs in pairs.
 // At the laptop, two frames of typing: the arm down on a key, then up.
 const TYPING = [
-  ['G....OOOOO', 'G....OKOKO', '.G..OOOOOO', '.GLGGO.O.O'],
-  ['G....OOOOO', 'G...OOKOKO', '.G...OOOOO', '.GGLGO.O.O'],
+  ['G....OOOOO', 'G....OKOKO', '.G..OOOOOO', '.GLGGOO.OO'],
+  ['G....OOOOO', 'G...OOKOKO', '.G...OOOOO', '.GGLGOO.OO'],
 ]
 // Done: the laptop shut, the arm resting
-const DONE = ['.....OOOOO', '.....OKOKO', '.....OOOOO', '.GGGGO.O.O']
+const DONE = ['.....OOOOO', '.....OKOKO', '.....OOOOO', '.GGGGOO.OO']
 // Walking, no laptop: two steps
 const WALKING = [
-  ['OOOOO', 'OKOKO', 'OOOOO', 'O.O.O'],
+  ['OOOOO', 'OKOKO', 'OOOOO', 'OO.OO'],
   ['OOOOO', 'OKOKO', 'OOOOO', '.O.O.'],
 ]
 
@@ -74,6 +75,18 @@ export function colorOf(type: string): string {
 
 export function oneLine(s: string): string {
   return s.replace(/\s+/g, ' ').trim()
+}
+
+// A command's secrets masked before it shows on screen: a secret flag's value,
+// an auth header, a query parameter or variable named like a key, and long
+// runs of letters and digits that read as a token
+export function redact(command: string): string {
+  return command
+    .replace(/(--?(?:token|password|passwd|secret|api[-_]?key|auth)[= ]+)[^\s'"]+/gi, '$1***')
+    .replace(/(authorization:\s*(?:bearer|basic|token)?\s*)[^\s'"]+/gi, '$1***')
+    .replace(/([?&](?:token|access_token|api_key|key|secret|password)=)[^&\s'"]+/gi, '$1***')
+    .replace(/\b([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=)[^\s'"]+/g, '$1***')
+    .replace(/[A-Za-z0-9_\-+=]{32,}/g, run => (/\d/.test(run) && /[A-Za-z]/.test(run) ? '***' : run))
 }
 
 function baseName(p: string): string {
@@ -99,7 +112,7 @@ export function describe(tool: string, input: Record<string, unknown>): string {
       return `buscando ${s('pattern')}`
     case 'Bash':
     case 'PowerShell':
-      return s('description') || `$ ${s('command')}`
+      return s('description') || `$ ${redact(s('command'))}`
     case 'WebSearch':
       return `googleando "${s('query')}"`
     case 'WebFetch': {
@@ -153,20 +166,92 @@ export function walk(agents: Agent[], t: number, bodyColumns: number): Agent[] {
 type Cell = { ch: string; style: Style }
 
 const NONE: Style = {}
+const BLANK: Cell = { ch: ' ', style: NONE }
+
+// Cells a code point takes in a terminal: none for joiners, variation
+// selectors, skin tones and combining marks; two for wide East Asian and emoji
+function cellWidth(cp: number): number {
+  if (
+    cp === 0x200d ||
+    (cp >= 0x0300 && cp <= 0x036f) ||
+    (cp >= 0xfe00 && cp <= 0xfe0f) ||
+    (cp >= 0x1f3fb && cp <= 0x1f3ff)
+  ) {
+    return 0
+  }
+  if (
+    (cp >= 0x1100 && cp <= 0x115f) ||
+    (cp >= 0x2e80 && cp <= 0xa4cf) ||
+    (cp >= 0xac00 && cp <= 0xd7a3) ||
+    (cp >= 0xf900 && cp <= 0xfaff) ||
+    (cp >= 0xfe30 && cp <= 0xfe4f) ||
+    (cp >= 0xff00 && cp <= 0xff60) ||
+    (cp >= 0xffe0 && cp <= 0xffe6) ||
+    (cp >= 0x1f300 && cp <= 0x1faff) ||
+    (cp >= 0x20000 && cp <= 0x3fffd)
+  ) {
+    return 2
+  }
+  return 1
+}
+
+// Each code point and the cells it takes; one after a joiner is drawn into
+// the glyph before it
+function glyphs(text: string): { ch: string; cells: number }[] {
+  const out: { ch: string; cells: number }[] = []
+  let isJoined = false
+  for (const ch of text) {
+    const cp = ch.codePointAt(0)!
+    out.push({ ch, cells: isJoined ? 0 : cellWidth(cp) })
+    isJoined = cp === 0x200d
+  }
+  return out
+}
+
+// How many terminal columns `text` takes
+export function columns(text: string): number {
+  return glyphs(text).reduce((n, g) => n + g.cells, 0)
+}
+
+// A wide glyph is its cell and an empty one after it. Clearing either half
+// clears the other, so a glyph drawn over it never leaves half a wide one
+function clear(row: Cell[], x: number) {
+  if (row[x]!.ch === '' && x > 0) row[x - 1] = BLANK
+  else if (row[x + 1]?.ch === '') row[x + 1] = BLANK
+  row[x] = BLANK
+}
 
 function put(row: Cell[], x: number, text: string, style: Style) {
-  for (const ch of text) {
-    if (x >= 0 && x < row.length) row[x] = { ch, style }
-    x += 1
+  let last = -1
+  for (const { ch, cells } of glyphs(text)) {
+    if (cells === 0) {
+      if (last >= 0) row[last] = { ch: row[last]!.ch + ch, style }
+      continue
+    }
+    if (x >= 0 && x + cells <= row.length) {
+      for (let k = 0; k < cells; k++) clear(row, x + k)
+      row[x] = { ch, style }
+      for (let k = 1; k < cells; k++) row[x + k] = { ch: '', style }
+      last = x
+    } else {
+      last = -1
+    }
+    x += cells
   }
 }
 
 // Clawd's own sprite, a cell per pixel, and what it holds; . is empty
 const CELL: Record<string, Cell> = {
-  // Orange cell; one with a dark eye in its lower half; one with a closed eye
+  // Orange cell; one with a dark eye in a lower quarter; one with a closed eye
   O: { ch: ' ', style: { bg: 'claude', fg: EYE_COLOR } },
-  E: { ch: '▄', style: { bg: 'claude', fg: EYE_COLOR } },
+  L: { ch: '▖', style: { bg: 'claude', fg: EYE_COLOR } },
+  R: { ch: '▗', style: { bg: 'claude', fg: EYE_COLOR } },
   '-': { ch: '▁', style: { bg: 'claude', fg: EYE_COLOR } },
+  // An arm at rest and raised, and a leg at either side of its cell
+  '^': { ch: '▀', style: { fg: 'claude' } },
+  v: { ch: '▄', style: { fg: 'claude' } },
+  a: { ch: '▘', style: { fg: 'claude' } },
+  b: { ch: '▝', style: { fg: 'claude' } },
   // A pan's handle, low and thin, and its pan
   h: { ch: '▄', style: { fg: '#8B5A2B' } },
   P: { ch: ' ', style: { bg: '#6B7280' } },
@@ -221,8 +306,15 @@ function segments(row: Cell[]): Segment[] {
 }
 
 function fit(text: string, width: number): string {
-  const chars = [...text]
-  return chars.length <= width ? text : chars.slice(0, Math.max(0, width - 1)).join('') + '…'
+  if (columns(text) <= width) return text
+  let out = ''
+  let used = 0
+  for (const { ch, cells } of glyphs(text)) {
+    if (used + cells > width - 1) break
+    out += ch
+    used += cells
+  }
+  return out + '…'
 }
 
 // The drawing at tick `t`: ROWS rows of styled segments
@@ -279,7 +371,7 @@ export function scene(
     const x = DESKS_X + speaker.x
     const text = fit(speaker.activity, width - x)
     put(rows[0]!, x, text, { fg: colorOf(speaker.type), bold: true })
-    spokenTo = x + [...text].length + 1
+    spokenTo = x + columns(text) + 1
   }
   shown.forEach((a, i) => {
     const x = DESKS_X + a.x
