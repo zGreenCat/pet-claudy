@@ -34,8 +34,8 @@ const HEAD_ARMS_UP = 'vOLOOROv'
 const BODY = '^OOOOOO^'
 const BODY_ARMS_UP = '.OOOOOO.'
 const LEGS = '.aa..bb.'
-const LEGS_STEP = 'a.a..b.b'
-const LEGS_HOP = '........'
+// The legs shuffled inward, still under the body
+const LEGS_STEP = '.bb..aa.'
 // An arm out to a pan
 const BODY_PAN = '^OOOOOOOhhPPPP'
 // A thin cigarette at the mouth, its ember dim, then drawn on with the eyes shut
@@ -51,7 +51,7 @@ const DANCE: Frame[] = [
   [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS_STEP],
   [HEAD, BODY, LEGS_STEP],
   [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS],
-  [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS_HOP],
+  [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS_STEP],
   [HEAD, BODY, LEGS],
 ]
 
@@ -122,7 +122,7 @@ function celebrating(since: number): { frame: Frame; marks: Mark[]; line: string
     const row = (since + k * 3) % 5
     if (row < 4) marks.push({ row, x: c.x, text: c.ch, fg: c.fg })
   })
-  const frame: Frame = isUp ? [HEAD_CHEER, BODY_ARMS_UP, LEGS_HOP] : [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS]
+  const frame: Frame = isUp ? [HEAD_CHEER, BODY_ARMS_UP, LEGS_STEP] : [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS]
   return { frame, marks, line: '¡listo!' }
 }
 

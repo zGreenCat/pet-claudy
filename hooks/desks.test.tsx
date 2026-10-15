@@ -51,8 +51,10 @@ test('buddies walk to their desks, then open their laptops and talk', () => {
   expect(text(seated)[0]).toContain('tarea a')
   expect(text(seated)[0]).toContain('tarea b')
   // Each one's laptop, and each one's two eyes
-  expect(cellsOf(seated[3]!, '#6B7280')).toBeGreaterThan(4)
-  expect(seated[2]!.filter(s => s.style.bg === '#1A1A1A').reduce((n, s) => n + s.text.length, 0)).toBe(4)
+  expect(cellsOf(seated[3]!, '#6B7280')).toBeGreaterThanOrEqual(4)
+  const eyes = seated[2]!.filter(s => s.style.fg === '#1A1A1A').map(s => s.text).join('')
+  // Each buddy's two; Clawd's own are a row up
+  expect(eyes.match(/[▖▗]/g)).toHaveLength(4)
 })
 
 test('code marks float over a working buddy', () => {

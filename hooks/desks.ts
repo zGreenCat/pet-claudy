@@ -44,22 +44,23 @@ const PALETTE = ['#6A9BCC', '#8DB360', '#C77DBB', '#D4A23C', '#5FB3A9', '#E07A5F
 const MARKS = ['=>', '++', '{}', '</>', '()', '&&', ';;', '#!']
 const MARK_COLORS = ['#E58FD0', '#F2C14E', '#7FD1E8']
 
-// Pixel colors: O Clawd, K eye, G laptop, L a lit key; . nothing
-const PIXEL: Record<string, string> = { O: 'claude', K: EYE_COLOR, G: '#6B7280', L: '#F3EFE6' }
+// Pixel colors: O Clawd, K eye, G laptop; . nothing
+const PIXEL: Record<string, string> = { O: 'claude', K: EYE_COLOR, G: '#6B7280' }
 
-// Sprites are four pixel rows, drawn two to a cell with half blocks: a small
-// Clawd, an eye at each side and its legs in pairs.
-// At the laptop, two frames of typing: the arm down on a key, then up.
+// Sprites are four pixel rows of two pixels a cell, drawn in quarter blocks
+// as fine as the big Clawd: a small one with an eye in each upper corner,
+// short arms and its legs in pairs. The laptop leans on its left.
+// At the laptop, two frames of typing: the hand down on a key, then up.
 const TYPING = [
-  ['G....OOOOO', 'G....OKOKO', '.G..OOOOOO', '.GLGGOO.OO'],
-  ['G....OOOOO', 'G...OOKOKO', '.G...OOOOO', '.GGLGOO.OO'],
+  ['..G........OOOOOOOO.', '..G........OKOOOOKO.', '...G.....OOOOOOOOOOO', '...GGGGG...O.O..O.O.'],
+  ['..G........OOOOOOOO.', '..G......O.OKOOOOKO.', '...G......OOOOOOOOOO', '...GGGGG...O.O..O.O.'],
 ]
 // Done: the laptop shut, the arm resting
-const DONE = ['.....OOOOO', '.....OKOKO', '.....OOOOO', '.GGGGOO.OO']
+const DONE = ['...........OOOOOOOO.', '...........OKOOOOKO.', '..........OOOOOOOOOO', '...GGGGG...O.O..O.O.']
 // Walking, no laptop: two steps
 const WALKING = [
-  ['OOOOO', 'OKOKO', 'OOOOO', 'OO.OO'],
-  ['OOOOO', 'OKOKO', 'OOOOO', '.O.O.'],
+  ['.OOOOOOOO.', '.OKOOOOKO.', 'OOOOOOOOOO', '.O.O..O.O.'],
+  ['.OOOOOOOO.', '.OKOOOOKO.', 'OOOOOOOOOO', '..O.O.O.O.'],
 ]
 
 function blink(sprite: string[]): string[] {
@@ -268,22 +269,40 @@ function paintCells(row: Cell[], x: number, sprite: string) {
   })
 }
 
-// A sprite of two pixel rows per cell row: a cell whose pixels match is its
-// background, so whole cells leave no seam; a half is a ▀ or ▄
-function paintPixels(rows: Cell[][], top: number, x: number, sprite: string[]) {
+// A cell's quarters as a glyph, by the quarters set: 1 upper left, 2 upper
+// right, 4 lower left, 8 lower right
+const QUARTERS = ' ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█'
+const PIXEL_ORDER = Object.values(PIXEL)
+
+// A sprite of two pixel rows and two pixel columns per cell. A cell all one
+// color is its background, so whole cells leave no seam; a full cell of two
+// is the commoner one behind a glyph of the other; a cell with empty pixels
+// is a glyph alone, in its rarest color
+function paintQuarters(rows: Cell[][], top: number, x: number, sprite: string[]) {
+  const width = Math.ceil(Math.max(...sprite.map(s => s.length)) / 2)
   for (let r = 0; r * 2 < sprite.length; r++) {
     const row = rows[top + r]!
     const upper = sprite[r * 2]!
     const lower = sprite[r * 2 + 1] ?? ''
-    for (let i = 0; i < Math.max(upper.length, lower.length); i++) {
+    for (let i = 0; i < width; i++) {
       if (x + i < 0 || x + i >= row.length) continue
-      const a = PIXEL[upper[i] ?? '.']
-      const b = PIXEL[lower[i] ?? '.']
-      if (!a && !b) continue
-      if (a === b) row[x + i] = { ch: ' ', style: { bg: a } }
-      else if (!b) row[x + i] = { ch: '▀', style: { fg: a } }
-      else if (!a) row[x + i] = { ch: '▄', style: { fg: b } }
-      else row[x + i] = { ch: '▀', style: { fg: a, bg: b } }
+      const px = [upper[i * 2], upper[i * 2 + 1], lower[i * 2], lower[i * 2 + 1]].map(p => PIXEL[p ?? '.'])
+      const mask = (c: string | undefined) => px.reduce((m, p, k) => (p === c ? m | (1 << k) : m), 0)
+      const count = (c: string) => px.filter(p => p === c).length
+      // Rarest first; a tie goes to the later color in PIXEL
+      const colors = PIXEL_ORDER.filter(c => count(c) > 0).sort(
+        (a, b) => count(a) - count(b) || PIXEL_ORDER.indexOf(b) - PIXEL_ORDER.indexOf(a),
+      )
+      if (colors.length === 0) continue
+      const isFull = px.every(p => p !== undefined)
+      if (colors.length === 1 && isFull) {
+        row[x + i] = { ch: ' ', style: { bg: colors[0]! } }
+      } else if (isFull) {
+        const bg = colors[colors.length - 1]!
+        row[x + i] = { ch: QUARTERS[15 - mask(bg)]!, style: { fg: colors[0]!, bg } }
+      } else {
+        row[x + i] = { ch: QUARTERS[15 - mask(undefined)]!, style: { fg: colors[0]! } }
+      }
     }
   }
 }
@@ -345,16 +364,16 @@ export function scene(
 
     if (!isSeated) {
       const step = WALKING[(t + i) % 2]!
-      paintPixels(rows, 2, x + BODY_X, blinks ? blink(step) : step)
+      paintQuarters(rows, 2, x + BODY_X, blinks ? blink(step) : step)
       return
     }
 
     if (isDone) {
-      paintPixels(rows, 2, x, DONE)
+      paintQuarters(rows, 2, x, DONE)
       put(rows[1]!, x + BODY_X + 2, '✓', { fg: DONE_COLOR, bold: true })
     } else {
       const typing = TYPING[(Math.floor(t / 2) + i) % 2]!
-      paintPixels(rows, 2, x, blinks ? blink(typing) : typing)
+      paintQuarters(rows, 2, x, blinks ? blink(typing) : typing)
       // Code marks pop up over its head, two beats in three
       const beat = Math.floor(t / 3) + i * 7
       if (beat % 3 !== 2) {
