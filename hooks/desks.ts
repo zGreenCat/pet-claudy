@@ -248,13 +248,15 @@ const CELL: Record<string, Cell> = {
   L: { ch: '▖', style: { bg: 'claude', fg: EYE_COLOR } },
   R: { ch: '▗', style: { bg: 'claude', fg: EYE_COLOR } },
   '-': { ch: '▁', style: { bg: 'claude', fg: EYE_COLOR } },
+  // Eyes of a mood, each its own glyph on the orange
+  ...Object.fromEntries([...'><┓┏'].map(ch => [ch, { ch, style: { bg: 'claude', fg: EYE_COLOR, bold: true } }])),
   // An arm at rest and raised, and a leg at either side of its cell
   '^': { ch: '▀', style: { fg: 'claude' } },
   v: { ch: '▄', style: { fg: 'claude' } },
   a: { ch: '▘', style: { fg: 'claude' } },
   b: { ch: '▝', style: { fg: 'claude' } },
-  // A pan's handle, low and thin, and its pan
-  h: { ch: '▄', style: { fg: '#8B5A2B' } },
+  // A pan's handle, thin and level with the arm that holds it, and its pan
+  h: { ch: '▀', style: { fg: '#8B5A2B' } },
   P: { ch: ' ', style: { bg: '#6B7280' } },
   // A cigarette, thin as a line, and its ember dim and drawn on
   c: { ch: '▂', style: { fg: '#EDEDED' } },

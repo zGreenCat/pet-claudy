@@ -23,6 +23,9 @@ const SMOKE_TICKS = 40
 //   O  orange cell
 //   L  orange cell, a dark eye in its lower left quarter; R the lower right
 //   -  orange cell with a closed eye (▁)
+//   > <  eyes squeezed with joy; ┓ ┏ half shut, at ease.
+//        Each eye is ASCII or a box-drawing glyph: terminals draw those
+//        themselves, so they read the same whatever the font
 //   ^  an arm at rest, the cell's upper half; v an arm raised, its lower half
 //   a  a leg in the cell's upper left quarter; b the upper right
 //   .  empty
@@ -37,12 +40,13 @@ const LEGS = '.aa..bb.'
 // The legs shuffled inward, still under the body
 const LEGS_STEP = '.bb..aa.'
 // An arm out to a pan
-const BODY_PAN = '^OOOOOOOhhPPPP'
+const BODY_PAN = '^OOOOOO^hhPPPP'
 // A thin cigarette at the mouth, its ember dim, then drawn on with the eyes shut
-const HEAD_SMOKE = '.OLOOROcccC'
+const HEAD_SMOKE = '.O┓OO┏OcccC'
 const HEAD_DRAW = '.O-OO-OcccY'
-// Cheering: arms up, eyes shut with joy
-const HEAD_CHEER = 'vO-OO-Ov'
+// Cheering: eyes squeezed with joy, the arms going up and down
+const HEAD_CHEER = 'vO>OO<Ov'
+const HEAD_JOY = '.O>OO<O.'
 
 export type Frame = [string, string, string]
 
@@ -114,15 +118,15 @@ function celebrating(since: number): { frame: Frame; marks: Mark[]; line: string
   const isSettling = since >= CELEBRATE_TICKS - 8
   if (isSettling) return { frame: IDLE, marks: [], line: '✓ listo' }
   const marks: Mark[] = [
-    { row: 0, x: 0, text: isUp ? '✦' : '+', fg: SPARKLE },
-    { row: 0, x: 7, text: isUp ? '+' : '✦', fg: SPARKLE },
+    { row: 0, x: 0, text: isUp ? '*' : '+', fg: SPARKLE },
+    { row: 0, x: 7, text: isUp ? '+' : '*', fg: SPARKLE },
   ]
   // Each piece falls one row a tick and starts over from above the band
   CONFETTI.forEach((c, k) => {
     const row = (since + k * 3) % 5
     if (row < 4) marks.push({ row, x: c.x, text: c.ch, fg: c.fg })
   })
-  const frame: Frame = isUp ? [HEAD_CHEER, BODY_ARMS_UP, LEGS_STEP] : [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS]
+  const frame: Frame = isUp ? [HEAD_CHEER, BODY_ARMS_UP, LEGS_STEP] : [HEAD_JOY, BODY, LEGS]
   return { frame, marks, line: '¡listo!' }
 }
 
