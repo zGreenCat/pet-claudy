@@ -149,32 +149,36 @@ test('Clawd cheers over a turn that answered, not over a subagent', async ($, on
 })
 
 test('a moment shows over work for a few seconds, then lets go', () => {
-  // The glasses go up on the forehead, then down over the eyes
-  expect(view(10, 0, true, 80, undefined, { mood: 'cool', since: 0 }).frame[0]).toBe('vSSSSSSv')
-  const cool = view(10, 0, true, 80, undefined, { mood: 'cool', since: 4 })
-  expect(cool.line).toBe('todo en verde')
-  expect(cool.frame[0]).toBe('.ssssss.')
-  expect(view(10, 0, true, 80, undefined, { mood: 'cool', since: MOMENT_TICKS.cool }).line).not.toBe('todo en verde')
+  const at = (mood: 'cool' | 'love' | 'idea', since: number) => view(10 + since, 0, true, 80, undefined, { mood, since })
+
+  // Cool: an arm lifts a little, sweeps down, and the glasses are on
+  expect(at('cool', 0).frame[0]).toBe('.OLOOROv')
+  expect(at('cool', 3).frame[0]).toBe('.ssssssv')
+  expect(at('cool', 5).frame[0]).toBe('.ssssss.')
+  expect(at('cool', 5).line).toBe('todo en verde')
+  expect(at('cool', MOMENT_TICKS.cool).line).not.toBe('todo en verde')
   // A finished turn's cheer beats any moment
   expect(view(10, 0, false, 80, 0, { mood: 'love', since: 0 }).line).toBe('¡listo!')
 
-  // An arm goes up before the heart shows, then the heart drifts over its head
-  const love = (since: number) => view(0, 0, true, 80, undefined, { mood: 'love', since })
-  const heart = (since: number) => love(since).marks.find(m => m.text === '♥')
-  expect(love(0).marks).toHaveLength(0)
-  expect(love(2).frame[0]).toBe('vOLOORO.')
-  expect(love(2).marks.map(m => m.text)).toEqual(['▗'])
-  expect(heart(4)).toBeUndefined()
-  expect(heart(15)!.x).toBeGreaterThan(heart(6)!.x)
+  // Love: a breath sinks the head half a cell, eyes shut, over legs that never
+  // move; then eyes squeezed and a heart beside it that beats
+  for (const since of [0, 3, 8, 12]) expect(at('love', since).frame[2]).toBe('.aa..bb.')
+  expect(at('love', 3).frame[0]).toMatch(/^\.v{6}\./)
+  expect(at('love', 3).frame[1]).toContain('m')
+  expect(at('love', 8).frame[0]).toContain('>')
+  const heartRows = (since: number) => at('love', since).marks.filter(m => m.fg !== 'claude').length
+  expect(heartRows(4)).toBe(0)
+  expect(heartRows(8)).toBe(3)
+  expect(at('love', 8).marks.map(m => m.text).join('')).not.toBe(at('love', 10).marks.map(m => m.text).join(''))
 
-  // A hand to the head while the bulb comes on dim, then it lights with rays
-  const idea = (since: number) => view(0, 0, true, 80, undefined, { mood: 'idea', since })
-  const bulb = (since: number) => idea(since).marks.filter(m => m.fg !== 'claude').map(m => m.text).join('')
-  expect(idea(0).frame[0]).toBe('.O┓OO┏Ov')
-  expect(bulb(0)).toBe('')
-  expect(bulb(2)).toBe('●')
-  expect(bulb(4)).toContain('\\')
-  expect(bulb(6)).toBe('●')
+  // Idea: the bulb shows dim, it looks up, the bulb lights, then wide eyes
+  const bulb = (since: number) => at('idea', since).marks.find(m => m.text === '●')!
+  expect(at('idea', 0).frame[0]).toBe('.OLOORO.')
+  expect(at('idea', 2).frame[0]).toBe('.OpOOpO.')
+  expect(bulb(2).fg).not.toBe(bulb(4).fg)
+  expect(at('idea', 6).frame[0]).toBe('.OwOOwO.')
+  expect(at('idea', 6).marks.map(m => m.text).join('')).toContain('\\')
+  expect(at('idea', 12).frame[0]).toBe('.OLOORO.')
 })
 
 test('thanks, passing tests, commits and fresh plans earn a moment', () => {
@@ -192,4 +196,15 @@ test('thanks, passing tests, commits and fresh plans earn a moment', () => {
   expect(cueOf('TodoWrite', { todos: [{ status: 'pending' }, { status: 'pending' }] }, true)).toBe('idea')
   expect(cueOf('TodoWrite', { todos: [{ status: 'completed' }, { status: 'pending' }] }, true)).toBeUndefined()
   expect(cueOf('Read', { file_path: 'a.ts' }, true)).toBeUndefined()
+})
+
+test('a moment during work keeps Clawd where it stood', () => {
+  // Dancing across the band, then a moment at tick 30: it stops right there
+  const walking = view(30, 0, true, 120).x
+  expect(walking).toBeGreaterThan(0)
+  for (const since of [0, 5, 10]) {
+    expect(view(30 + since, 0, true, 120, undefined, { mood: 'love', since }).x).toBe(walking)
+  }
+  // Idle, it stays put
+  expect(view(30, 0, false, 120, undefined, { mood: 'cool', since: 6 }).x).toBe(0)
 })

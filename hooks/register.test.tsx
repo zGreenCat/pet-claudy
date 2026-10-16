@@ -155,7 +155,7 @@ test('tests that pass put on the sunglasses; tests that fail do not', async ($, 
   isError = false
   await $.tool.call({ tool: 'Bash', command: 'npm test', description: 'Run tests' })
   // The glasses go on first
-  await e.ticks(4)
+  await e.ticks(5)
   expect(await shows($, /todo en verde/)).toBe(true)
   await e.ticks(30)
   expect(await shows($, /todo en verde/)).toBe(false)

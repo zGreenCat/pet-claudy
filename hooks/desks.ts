@@ -255,6 +255,11 @@ const CELL: Record<string, Cell> = {
   S: { ch: '▀', style: { bg: 'claude', fg: EYE_COLOR } },
   l: { ch: '▘', style: { bg: 'claude', fg: EYE_COLOR } },
   r: { ch: '▝', style: { bg: 'claude', fg: EYE_COLOR } },
+  // Eyes looking up, and eyes wide open
+  p: { ch: '°', style: { bg: 'claude', fg: EYE_COLOR, bold: true } },
+  w: { ch: '●', style: { bg: 'claude', fg: EYE_COLOR } },
+  // An eye shut tight
+  m: { ch: '━', style: { bg: 'claude', fg: EYE_COLOR, bold: true } },
   // An arm at rest and raised, and a leg at either side of its cell
   '^': { ch: '▀', style: { fg: 'claude' } },
   v: { ch: '▄', style: { fg: 'claude' } },
