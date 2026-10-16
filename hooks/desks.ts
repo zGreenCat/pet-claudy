@@ -41,6 +41,10 @@ const RESULT_TICKS = 16
 const EYE_COLOR = '#1A1A1A'
 const BOOK_COLOR = '#3E3A7A'
 const PAGE_COLOR = '#E4DCCB'
+const CAPE_COLOR = '#C8323C'
+const MUG_COLOR = '#9AA0A8'
+const COFFEE_COLOR = '#6B4430'
+const PHONES_COLOR = '#2E6FD0'
 const DONE_COLOR = '#8DB360'
 const PALETTE = ['#6A9BCC', '#8DB360', '#C77DBB', '#D4A23C', '#5FB3A9', '#E07A5F']
 const MARKS = ['=>', '++', '{}', '</>', '()', '&&', ';;', '#!']
@@ -269,6 +273,20 @@ const CELL: Record<string, Cell> = {
   '4': { ch: '▟', style: { fg: PAGE_COLOR } },
   '5': { ch: '▄', style: { bg: 'claude', fg: PAGE_COLOR } },
   '6': { ch: '▟', style: { bg: 'claude', fg: PAGE_COLOR } },
+  // Super Clawd: a collar, the cape, a leg over it, its edges stepping out, the cape blown up
+  n: { ch: '▔', style: { bg: 'claude', fg: CAPE_COLOR } },
+  u: { ch: ' ', style: { bg: CAPE_COLOR } },
+  j: { ch: '▘', style: { bg: CAPE_COLOR, fg: 'claude' } },
+  J: { ch: '▝', style: { bg: CAPE_COLOR, fg: 'claude' } },
+  k: { ch: '▝', style: { fg: CAPE_COLOR } },
+  K: { ch: '▘', style: { fg: CAPE_COLOR } },
+  e: { ch: '▀', style: { fg: CAPE_COLOR } },
+  // Coffee over a mug, the mug, its handle toward Clawd; a headphone's ear cups
+  x: { ch: '▝', style: { bg: MUG_COLOR, fg: COFFEE_COLOR } },
+  X: { ch: '▘', style: { bg: MUG_COLOR, fg: COFFEE_COLOR } },
+  N: { ch: '(', style: { fg: MUG_COLOR } },
+  '[': { ch: '▐', style: { fg: PHONES_COLOR } },
+  ']': { ch: '▌', style: { fg: PHONES_COLOR } },
   // An arm at rest and raised, and a leg at either side of its cell
   '^': { ch: '▀', style: { fg: 'claude' } },
   v: { ch: '▄', style: { fg: 'claude' } },

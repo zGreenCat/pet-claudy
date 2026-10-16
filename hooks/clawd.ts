@@ -32,6 +32,13 @@ const SMOKE_TICKS = 40
 //        2 their edge with the cover's spine beside it) inside the long blue
 //        L of its cover (3); 4 a page turning. Over the body, the pages'
 //        top (5) and a turning page (6) keep the orange behind them
+//   n  a red collar along the top of the body; u a red cape showing below
+//      the body, hanging half a cell past its legs; j J a leg in front of it,
+//      left or right; k K the cape's edge stepping out a quarter, left or
+//      right; e the cape blown up between the legs, its upper half
+//   x X  a square mug, one cell high and two wide, coffee in the middle of
+//        its top row; N its handle, toward Clawd
+//   [ ]  a headphone's ear cup, left or right
 //        Each eye is ASCII or a box-drawing glyph: terminals draw those
 //        themselves, so they read the same whatever the font
 //   ^  an arm at rest, the cell's upper half; v an arm raised, its lower half
@@ -77,6 +84,21 @@ const HEAD_READ = '.OROORO.'
 const BODY_BOOK_OPEN = '^OOOOO52'
 const BODY_BOOK_TURN = '^OOOOO62'
 const LEGS_BOOK = '.aa..b33'
+// Super Clawd: a collar, and a cape behind it showing below its body and
+// hanging past its legs, its edges stepping out a little; then a fist up
+// while the cape flaps in a wave. Each column of it either hangs down or is
+// blown up: between the legs it shows its upper half, behind a leg it hides
+const BODY_SUPER = '^nnnnnn^'
+const BODY_SUPER_FIST = '^nnnnnn.'
+const CAPE_DOWN = 'kjjuuJJK'
+const CAPE_UP = 'kaaeebbK'
+// A coffee break: a square mug in hand, the coffee showing in the middle of
+// its top row, lifted to the mouth for a sip, eyes shut
+const BODY_MUG = '^OOOOOO^NxX'
+const HEAD_SIP = '.O-OO-OvNxX'
+// Music: headphones on, the cups at its sides and the band arching clear of
+// its head; eyes shut, a foot tapping
+const HEAD_MUSIC = '[OmOOmO]'
 // Magic: the rows run on blank past Clawd, room for the wand and its sparks
 const SPELL_ROOM = '............'
 // An idea: eyes up at the bulb, then wide open at the thought
@@ -180,14 +202,20 @@ function smoking(t: number): { frame: Frame; marks: Mark[] } {
 
 // A moment: something went well, someone said thanks, a plan came together.
 // It shows for a few seconds over whatever Clawd was doing, then lets go
-export type Mood = 'cool' | 'love' | 'idea' | 'magic'
+export type Mood = 'cool' | 'love' | 'idea' | 'magic' | 'super'
 export type Moment = { mood: Mood; since: number }
-export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 20, idea: 16, magic: 16 }
+export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 20, idea: 16, magic: 16, super: 24 }
 const HEART = '#E5484D'
 const BULB = '#F2C14E'
 // A wooden wand with a white tip
 const WAND = '#A07A5A'
 const WAND_TIP = '#FFFFFF'
+const STEAM = '#B8BCC4'
+
+const PHONES = '#2E6FD0'
+// Notes off the headphones, drawn in quarter blocks: a head and a stem
+const NOTE = '▟'
+const NOTE_COLORS = ['#7FD1E8', '#E58FD0']
 // Sparks a flicked wand throws: where each starts past the wand's tip and its
 // color; they drift away and twinkle
 const SPARKS = [
@@ -280,6 +308,10 @@ function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string } {
       if (s < 6) return { frame: room([HEAD_JOY, BODY, LEGS]), marks: [...wand, ...sparks], line: '¡cadabra!' }
       return { frame: room(IDLE), marks: [...wand, ...sparks], line: '¡magia!' }
     }
+    case 'super':
+      // The cape and collar come on; then a fist goes up and the cape flaps
+      if (s < 4) return { frame: [HEAD, BODY_SUPER, CAPE_DOWN], marks: [], line: '¡súper!' }
+      return { frame: [HEAD_ARM_LIFTED, BODY_SUPER_FIST, capeWave(Math.floor(s / 2))], marks: [], line: '¡súper Clawd!' }
   }
 }
 
@@ -291,12 +323,43 @@ function reading(since: number): { frame: Frame; marks: Mark[]; line: string } {
   return { frame: [head, body, LEGS_BOOK], marks: [], line: 'leyendo…' }
 }
 
+// The cape in a wave, `phase` steps along: each column hangs down or is blown
+// up, in runs of two that travel across it
+function capeWave(phase: number): string {
+  return [...CAPE_DOWN].map((down, c) => ((c + phase) % 4 < 2 ? down : CAPE_UP[c]!)).join('')
+}
+
+// Headphones on while a long command runs: the band over its head, notes
+// drifting up off it, and a foot tapping to the beat
+function listening(since: number): { frame: Frame; marks: Mark[]; line: string } {
+  const band: Mark = { row: 0, x: 0, text: '╭──────╮', fg: PHONES }
+  const k = Math.floor(since / 4)
+  const note: Mark = { row: since % 4 < 2 ? 1 : 0, x: 9 + (since % 4 < 2 ? 0 : 1) + (k % 2) * 2, text: NOTE, fg: NOTE_COLORS[k % NOTE_COLORS.length]! }
+  return { frame: [HEAD_MUSIC, BODY, since % 4 < 2 ? LEGS : LEGS_TAP], marks: [band, note], line: 'musiquita…' }
+}
+
+// A coffee break: steam curling up off the mug, and every so often a sip
+function coffee(t: number): { frame: Frame; marks: Mark[] } {
+  if (t % 16 < 3) return { frame: [HEAD_SIP, BODY_ARM_LIFTED, LEGS], marks: [] }
+  const marks: Mark[] = [{ row: 1, x: t % 4 < 2 ? 9 : 10, text: '~', fg: STEAM }]
+  return { frame: [HEAD, BODY_MUG, LEGS], marks }
+}
+
+// Which break an idle Clawd is on: they take turns, a smoke then a coffee
+function isCoffeeBreak(idleTicks: number): boolean {
+  return Math.floor(idleTicks / SMOKE_EVERY) % 2 === 1
+}
+
 // Tools that read: enough of them in a row and Clawd sits down to read
 const READS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch'])
 // How many reads, within how many ticks, start it; how long without one ends it
 export const READS_TO_START = 3
 export const READS_WINDOW_TICKS = 20
 export const READING_LINGER_TICKS = 12
+// How long a command must run before the headphones go on
+export const MUSIC_AFTER_TICKS = 8
+// Subagents spawned within this many ticks of each other make Clawd super
+export const SUPER_WINDOW_TICKS = 8
 
 export function isRead(tool: string): boolean {
   return READS.has(tool)
@@ -338,8 +401,8 @@ export function isSmoking(idleTicks: number): boolean {
 }
 
 // What Clawd shows at tick `t`, given how long the session has been idle,
-// when a turn just ended how many ticks ago, the moment it is having, and
-// how many ticks it has been reading
+// when a turn just ended how many ticks ago, the moment it is having, how
+// many ticks it has been reading, and how long a command has been running
 export function view(
   t: number,
   idleTicks: number,
@@ -348,6 +411,7 @@ export function view(
   since?: number,
   now?: Moment,
   readingFor?: number,
+  runningFor?: number,
 ): View {
   if (since !== undefined && since >= 0 && since < CELEBRATE_TICKS) {
     return { ...celebrating(since), x: 0, isWorking: true }
@@ -361,6 +425,10 @@ export function view(
     // It stops where it stood to read, and walks on from there after
     return { ...reading(readingFor), x: walked(Math.max(0, t - readingFor), WIDTH, bodyColumns), isWorking }
   }
+  if (isWorking && runningFor !== undefined && runningFor >= MUSIC_AFTER_TICKS) {
+    const listened = runningFor - MUSIC_AFTER_TICKS
+    return { ...listening(listened), x: walked(Math.max(0, t - listened), WIDTH, bodyColumns), isWorking }
+  }
   if (isWorking) {
     const line = WORKING_LINES[Math.floor(t / 24) % WORKING_LINES.length]!
     const pose = line.startsWith('cocinando') ? cooking(t) : { frame: DANCE[t % DANCE.length]!, marks: [] }
@@ -372,6 +440,7 @@ export function view(
     return { frame: BLINK, marks: [], x: 0, line: 'zzz', isWorking }
   }
   if (isSmoking(idleTicks)) {
+    if (isCoffeeBreak(idleTicks)) return { ...coffee(t), x: 0, line: 'un cafecito', isWorking }
     return { ...smoking(t), x: 0, line: 'en mi break', isWorking }
   }
   // Blink once every ~4s, sway every second

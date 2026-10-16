@@ -7,6 +7,7 @@ import {
   READING_LINGER_TICKS,
   READS_TO_START,
   READS_WINDOW_TICKS,
+  SUPER_WINDOW_TICKS,
   TICK_MS,
   WIDTH,
   cueOf,
@@ -50,16 +51,24 @@ export const register: Register = on => {
   let reads: number[] = []
   let readingFrom: number | undefined
   const readingFor = () => (readingFrom === undefined ? undefined : t - readingFrom)
+  // Commands the main loop has running, and the tick the first of them began
+  let running = 0
+  let runningFrom: number | undefined
+  const runningFor = () => (runningFrom === undefined ? undefined : t - runningFrom)
+  // The ticks recent subagents were spawned
+  let spawns: number[] = []
 
   const isBusy = () => isWorking || agents.some(a => a.doneAt === undefined)
 
   function drawKey(): string {
-    if (agents.length === 0) return viewKey(view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor()))
+    if (agents.length === 0) {
+      return viewKey(view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor(), runningFor()))
+    }
     return `T${JSON.stringify(desksScene())}`
   }
 
   function soloScene(): Segment[][] {
-    const v = view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor())
+    const v = view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor(), runningFor())
     return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns)
   }
 
@@ -126,7 +135,12 @@ export const register: Register = on => {
   // (a workflow's), which the check of the list would send off as done
   on('agent.spawn', async ($, e, next) => {
     const started = await next(e)
-    if (started.agentId && !e.workflow) seat(started.agentId, e.subagentType, oneLine(e.description))
+    if (started.agentId && !e.workflow) {
+      seat(started.agentId, e.subagentType, oneLine(e.description))
+      // Two or more at once: Clawd suits up
+      spawns = [...spawns.filter(s => t - s < SUPER_WINDOW_TICKS), t]
+      if (spawns.length >= 2 && cue?.mood !== 'super') cue = { mood: 'super', at: t }
+    }
     return started
   }).catch(($, e, next) => next(e))
 
@@ -144,7 +158,21 @@ export const register: Register = on => {
       reads = [...reads.filter(r => t - r < READS_WINDOW_TICKS), t]
       if (readingFrom === undefined && reads.length >= READS_TO_START) readingFrom = t
     }
-    const answer = await next(e)
+    // While the main loop waits on a command, the headphones go on
+    const isCommand = e.agentId === undefined && e.tool === 'Bash'
+    if (isCommand) {
+      running += 1
+      runningFrom ??= t
+    }
+    let answer
+    try {
+      answer = await next(e)
+    } finally {
+      if (isCommand) {
+        running -= 1
+        if (running === 0) runningFrom = undefined
+      }
+    }
     const mood = cueOf(e.tool, input, answer.deny === undefined && answer.isError !== true)
     if (mood) cue = { mood, at: t }
     return answer

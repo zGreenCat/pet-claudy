@@ -242,3 +242,43 @@ test('reading: a book held low at its side and its eyes on it', () => {
   // It stops where it stood when it started reading
   expect(at(5).x).toBe(view(40, 0, true, 80).x)
 })
+
+test('super Clawd: a cape and collar, then a fist up and the cape flapping', () => {
+  const at = (since: number) => view(10 + since, 0, true, 80, undefined, { mood: 'super', since })
+  // The cape shows below the body, behind full-height legs, its edges stepping out
+  expect(at(0).frame).toEqual(['.OLOORO.', '^nnnnnn^', 'kjjuuJJK'])
+  expect(at(4).frame[0]).toBe('.OLOOROv')
+  // The cape flaps in a wave: some columns hang down while others blow up,
+  // and the wave moves along
+  const cape = (since: number) => at(since).frame[2]!
+  expect(cape(4)).toMatch(/[ju]/)
+  expect(cape(4)).toMatch(/[ae]/)
+  expect(cape(6)).not.toBe(cape(4))
+  expect(new Set([4, 6, 8, 10].map(cape)).size).toBe(4)
+  expect(at(4).line).toBe('¡súper Clawd!')
+})
+
+test('idle breaks take turns: a smoke, then a coffee', () => {
+  expect(view(0, 220, false, 80).line).toBe('en mi break')
+  const coffee = (t: number) => view(t, 460, false, 80)
+  expect(coffee(4).line).toBe('un cafecito')
+  // A mug with coffee showing over its top
+  // The handle toward Clawd's hand
+  // A square mug, coffee in the middle of its top row
+  expect(coffee(4).frame[1]).toBe('^OOOOOO^NxX')
+  // Steam curls up, and every so often a sip with the eyes shut
+  expect(coffee(4).marks.map(m => m.text)).toEqual(['~'])
+  expect(coffee(16).frame[0]).toBe('.O-OO-OvNxX')
+})
+
+test('a long command puts the headphones on, notes drifting up', () => {
+  const at = (runningFor: number) => view(40 + runningFor, 0, true, 80, undefined, undefined, undefined, runningFor)
+  // Not for a quick one
+  expect(at(4).line).not.toBe('musiquita…')
+  expect(at(8).line).toBe('musiquita…')
+  // Cups at its sides and a thin band arching clear of its head
+  expect(at(8).frame[0]).toBe('[OmOOmO]')
+  expect(at(8).marks.map(m => m.text)).toContain('╭──────╮')
+  // The foot taps
+  expect(at(8).frame[2]).not.toBe(at(10).frame[2])
+})

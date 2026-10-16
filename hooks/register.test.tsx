@@ -177,3 +177,34 @@ test('reads one after another sit Clawd down to read, until they stop', async ($
   await e.ticks(14)
   expect(await shows($, /leyendo/)).toBe(false)
 })
+
+test('two subagents at once make Clawd super, one alone does not', async ($, on) => {
+  const e = engine(on)
+  await start($)
+
+  await $.agent.spawn(spawnOf('uno'))
+  expect(await shows($, /▔/)).toBe(false)
+  await e.ticks(2)
+  await $.agent.spawn(spawnOf('dos'))
+  // The collar shows on Clawd beside the desks
+  expect(await shows($, /▔/)).toBe(true)
+})
+
+test('a long command puts the headphones on until it ends', async ($, on) => {
+  const e = engine(on)
+  on('classic.PreToolUse', () => ({}))
+  on('tool.call', async () => {
+    await e.clock.sleep(4000)
+    return { result: { stdout: '', stderr: '', interrupted: false }, text: '' }
+  })
+  await start($)
+
+  const call = $.tool.call({ tool: 'Bash', command: 'npm run build', description: 'Build' })
+  await e.ticks(4)
+  expect(await shows($, /musiquita/)).toBe(false)
+  await e.ticks(6)
+  expect(await shows($, /musiquita/)).toBe(true)
+  await e.ticks(8)
+  await call
+  expect(await shows($, /musiquita/)).toBe(false)
+})
