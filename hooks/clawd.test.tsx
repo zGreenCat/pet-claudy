@@ -193,6 +193,7 @@ test('thanks, passing tests, commits and fresh plans earn a moment', () => {
   expect(cueOf('Bash', { command: 'ls tests/' }, true)).toBeUndefined()
 
   expect(cueOf('ExitPlanMode', {}, true)).toBe('idea')
+  expect(cueOf('Skill', { skill: 'pdf' }, true)).toBe('magic')
   expect(cueOf('TodoWrite', { todos: [{ status: 'pending' }, { status: 'pending' }] }, true)).toBe('idea')
   expect(cueOf('TodoWrite', { todos: [{ status: 'completed' }, { status: 'pending' }] }, true)).toBeUndefined()
   expect(cueOf('Read', { file_path: 'a.ts' }, true)).toBeUndefined()
@@ -207,4 +208,37 @@ test('a moment during work keeps Clawd where it stood', () => {
   }
   // Idle, it stays put
   expect(view(30, 0, false, 120, undefined, { mood: 'cool', since: 6 }).x).toBe(0)
+})
+
+test('magic: a wand lifted, a flick, and sparks that drift away', () => {
+  const at = (since: number) => view(10 + since, 0, true, 80, undefined, { mood: 'magic', since })
+  const texts = (since: number) => at(since).marks.map(m => m.text)
+  // The arm lifts a little with the wand up, then its tip glints
+  expect(at(0).frame[0]!.slice(0, 8)).toBe('.OLOOROv')
+  // Two cells up from the hand, the top one its white tip
+  expect(texts(0)).toEqual(['▎', '▎'])
+  expect(at(0).marks.map(m => m.fg)).toContain('#FFFFFF')
+  expect(texts(2)).toContain('*')
+  // The flick: the wand level, eyes squeezed, sparks off its tip
+  expect(at(4).frame[0]).toContain('>')
+  expect(texts(4)).toEqual(expect.arrayContaining(['▂▂', '▂']))
+  const sparkX = (since: number) => Math.min(...at(since).marks.filter(m => !m.text.startsWith('▂')).map(m => m.x))
+  expect(sparkX(13)).toBeGreaterThan(sparkX(4))
+  // The line clears the wand and the sparks
+  expect(at(8).frame[0]!.length).toBeGreaterThan(16)
+})
+
+test('reading: a book held low at its side and its eyes on it', () => {
+  const at = (readingFor: number) => view(40 + readingFor, 0, true, 80, undefined, undefined, readingFor)
+  expect(at(0).line).toBe('leyendo…')
+  // Its eyes on the book, which it holds in front of its arm and body
+  expect(at(0).frame[0]).toBe('.OROORO.')
+  expect(at(0).frame[1]).toBe('^OOOOO52')
+  expect(at(0).frame[2]).toBe('.aa..b33')
+  expect(at(14).frame[1]).toBe('^OOOOO62')
+  // Only while working; a moment wins over reading
+  expect(view(40, 0, false, 80, undefined, undefined, 0).line).not.toBe('leyendo…')
+  expect(view(40, 0, true, 80, undefined, { mood: 'cool', since: 6 }, 0).line).toBe('todo en verde')
+  // It stops where it stood when it started reading
+  expect(at(5).x).toBe(view(40, 0, true, 80).x)
 })

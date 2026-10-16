@@ -160,3 +160,20 @@ test('tests that pass put on the sunglasses; tests that fail do not', async ($, 
   await e.ticks(30)
   expect(await shows($, /todo en verde/)).toBe(false)
 })
+
+test('reads one after another sit Clawd down to read, until they stop', async ($, on) => {
+  const e = engine(on)
+  on('classic.PreToolUse', () => ({}))
+  on('tool.call', () => ({ result: { type: 'text', file: { filePath: 'a.ts', content: '', numLines: 0, startLine: 1, totalLines: 0 } }, text: '' }))
+  await start($)
+
+  await $.tool.call({ tool: 'Read', file_path: '/a.ts' })
+  await $.tool.call({ tool: 'Read', file_path: '/b.ts' })
+  expect(await shows($, /leyendo/)).toBe(false)
+  await $.tool.call({ tool: 'Read', file_path: '/c.ts' })
+  expect(await shows($, /leyendo/)).toBe(true)
+
+  // A while with nothing read and it gets up
+  await e.ticks(14)
+  expect(await shows($, /leyendo/)).toBe(false)
+})

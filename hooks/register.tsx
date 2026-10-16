@@ -2,7 +2,19 @@ import { atom, read, update } from 'claude-code'
 import type { AgentStatus, Register } from 'claude-code'
 
 import type { Tick } from '../types'
-import { CELEBRATE_TICKS, TICK_MS, WIDTH, cueOf, isThanks, view, viewKey } from './clawd'
+import {
+  CELEBRATE_TICKS,
+  READING_LINGER_TICKS,
+  READS_TO_START,
+  READS_WINDOW_TICKS,
+  TICK_MS,
+  WIDTH,
+  cueOf,
+  isRead,
+  isThanks,
+  view,
+  viewKey,
+} from './clawd'
 import type { Frame, Moment, Mood } from './clawd'
 import { START_X, describe, oneLine, scene, solo, summary, walk } from './desks'
 import type { Agent, Segment } from './desks'
@@ -34,16 +46,20 @@ export const register: Register = on => {
   let cue: { mood: Mood; at: number } | undefined
 
   const now = (): Moment | undefined => (cue ? { mood: cue.mood, since: t - cue.at } : undefined)
+  // The ticks of the main loop's recent reads, and the tick it sat down to read
+  let reads: number[] = []
+  let readingFrom: number | undefined
+  const readingFor = () => (readingFrom === undefined ? undefined : t - readingFrom)
 
   const isBusy = () => isWorking || agents.some(a => a.doneAt === undefined)
 
   function drawKey(): string {
-    if (agents.length === 0) return viewKey(view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now()))
+    if (agents.length === 0) return viewKey(view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor()))
     return `T${JSON.stringify(desksScene())}`
   }
 
   function soloScene(): Segment[][] {
-    const v = view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now())
+    const v = view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor())
     return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns)
   }
 
@@ -70,6 +86,7 @@ export const register: Register = on => {
       try {
         t += 1
         idleTicks = isBusy() ? 0 : idleTicks + 1
+        if (readingFrom !== undefined && t - (reads[reads.length - 1] ?? t) > READING_LINGER_TICKS) readingFrom = undefined
         agents = walk(agents, t, bodyColumns)
 
         // An agent whose loop ended without a SubagentStop still leaves its desk
@@ -122,6 +139,11 @@ export const register: Register = on => {
       const activity = describe(e.tool, input)
       agents = agents.map(x => (x === a ? { ...x, activity } : x))
     }
+    // The main loop reading one thing after another sits down to read
+    if (e.agentId === undefined && isRead(e.tool)) {
+      reads = [...reads.filter(r => t - r < READS_WINDOW_TICKS), t]
+      if (readingFrom === undefined && reads.length >= READS_TO_START) readingFrom = t
+    }
     const answer = await next(e)
     const mood = cueOf(e.tool, input, answer.deny === undefined && answer.isError !== true)
     if (mood) cue = { mood, at: t }
@@ -134,6 +156,8 @@ export const register: Register = on => {
       finishedAt = t
       isWorking = false
       idleTicks = 0
+      reads = []
+      readingFrom = undefined
     }
     return next(e)
   }).catch(($, e, next) => next(e))

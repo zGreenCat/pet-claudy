@@ -28,6 +28,10 @@ const SMOKE_TICKS = 40
 //      l and r a lens's inner edge, the upper left or right quarter
 //   p  an eye looking up (°); w an eye wide open (●)
 //   m  an eye shut tight (━), for a face sunk half a cell
+//   1 2 3  a book held low at its side, in front of its arm and body: a small light L of pages (1 their top,
+//        2 their edge with the cover's spine beside it) inside the long blue
+//        L of its cover (3); 4 a page turning. Over the body, the pages'
+//        top (5) and a turning page (6) keep the orange behind them
 //        Each eye is ASCII or a box-drawing glyph: terminals draw those
 //        themselves, so they read the same whatever the font
 //   ^  an arm at rest, the cell's upper half; v an arm raised, its lower half
@@ -67,6 +71,14 @@ const BODY_COOL = '^OSlrSO^'
 const ROOM = '.....'
 const HEAD_BREATH = '.vvvvvv.' + ROOM
 const BODY_BREATH = 'vOmOOmOv' + ROOM
+// Reading: a book held low at its side, in front of its arm and body, and
+// its eyes on it
+const HEAD_READ = '.OROORO.'
+const BODY_BOOK_OPEN = '^OOOOO52'
+const BODY_BOOK_TURN = '^OOOOO62'
+const LEGS_BOOK = '.aa..b33'
+// Magic: the rows run on blank past Clawd, room for the wand and its sparks
+const SPELL_ROOM = '............'
 // An idea: eyes up at the bulb, then wide open at the thought
 const HEAD_LOOK_UP = '.OpOOpO.'
 const HEAD_WIDE = '.OwOOwO.'
@@ -168,11 +180,23 @@ function smoking(t: number): { frame: Frame; marks: Mark[] } {
 
 // A moment: something went well, someone said thanks, a plan came together.
 // It shows for a few seconds over whatever Clawd was doing, then lets go
-export type Mood = 'cool' | 'love' | 'idea'
+export type Mood = 'cool' | 'love' | 'idea' | 'magic'
 export type Moment = { mood: Mood; since: number }
-export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 20, idea: 16 }
+export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 20, idea: 16, magic: 16 }
 const HEART = '#E5484D'
 const BULB = '#F2C14E'
+// A wooden wand with a white tip
+const WAND = '#A07A5A'
+const WAND_TIP = '#FFFFFF'
+// Sparks a flicked wand throws: where each starts past the wand's tip and its
+// color; they drift away and twinkle
+const SPARKS = [
+  { row: 1, dx: 0, text: '*', fg: '#F2C14E' },
+  { row: 0, dx: 2, text: '+', fg: '#F2C14E' },
+  { row: 2, dx: 3, text: '*', fg: '#E58FD0' },
+  { row: 3, dx: 1, text: '·', fg: '#F2C14E' },
+  { row: 1, dx: 5, text: '·', fg: '#7FD1E8' },
+]
 const BULB_OFF = '#B8BCC4'
 
 // A cell's quarters as a glyph, by the quarters lit: 1 upper left, 2 upper
@@ -233,7 +257,49 @@ function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string } {
       if (s < 6) return { frame: [HEAD_LOOK_UP, BODY, LEGS], marks: [bulb], line: isLit ? '¡oh!' : 'mmm…' }
       return { frame: [s < 10 ? HEAD_WIDE : HEAD, BODY, LEGS], marks: [bulb, ...rays], line: '¡idea!' }
     }
+    case 'magic': {
+      // An arm lifts the wand, its tip glints; a flick down, eyes squeezed,
+      // and sparks fly off the tip and drift away twinkling
+      const room = (frame: Frame): Frame => [frame[0] + SPELL_ROOM, frame[1] + SPELL_ROOM, frame[2] + SPELL_ROOM]
+      // As thin as the cigarette, a quarter of a cell: two cells up from the
+      // hand, then three along the arm, the last one its white tip
+      const wandUp: Mark[] = [
+        { row: 1, x: 8, text: '▎', fg: WAND },
+        { row: 0, x: 8, text: '▎', fg: WAND_TIP },
+      ]
+      if (s < 2) return { frame: room([HEAD_ARM_LIFTED, BODY_ARM_LIFTED, LEGS]), marks: wandUp, line: 'abra…' }
+      if (s < 4) {
+        return { frame: room([HEAD_ARM_LIFTED, BODY_ARM_LIFTED, LEGS]), marks: [...wandUp, { row: 0, x: 9, text: '*', fg: BULB }], line: 'abra…' }
+      }
+      const wand: Mark[] = [
+        { row: 1, x: 8, text: '▂▂', fg: WAND },
+        { row: 1, x: 10, text: '▂', fg: WAND_TIP },
+      ]
+      const drift = Math.floor((s - 4) / 3)
+      const sparks = SPARKS.filter((_, k) => (s + k) % 3 !== 0).map(p => ({ row: p.row, x: 12 + p.dx + drift, text: p.text, fg: p.fg }))
+      if (s < 6) return { frame: room([HEAD_JOY, BODY, LEGS]), marks: [...wand, ...sparks], line: '¡cadabra!' }
+      return { frame: room(IDLE), marks: [...wand, ...sparks], line: '¡magia!' }
+    }
   }
+}
+
+// Reading, `since` ticks into it: its eyes on the book, a blink now and then,
+// and every so often a page turns
+function reading(since: number): { frame: Frame; marks: Mark[]; line: string } {
+  const head = since % 16 === 11 ? HEAD_BLINK : HEAD_READ
+  const body = since % 16 >= 14 ? BODY_BOOK_TURN : BODY_BOOK_OPEN
+  return { frame: [head, body, LEGS_BOOK], marks: [], line: 'leyendo…' }
+}
+
+// Tools that read: enough of them in a row and Clawd sits down to read
+const READS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch'])
+// How many reads, within how many ticks, start it; how long without one ends it
+export const READS_TO_START = 3
+export const READS_WINDOW_TICKS = 20
+export const READING_LINGER_TICKS = 12
+
+export function isRead(tool: string): boolean {
+  return READS.has(tool)
 }
 
 const THANKS = /\b(gracias|grax|thanks|thank you|thx)\b|<3|❤|♥/i
@@ -248,13 +314,14 @@ export function isThanks(text: string): boolean {
 
 // The moment a finished tool call earns, if any: tests that pass or a commit
 // that lands, cool; a plan just made (ExitPlanMode, or a todo list with
-// nothing started yet), an idea
+// nothing started yet), an idea; a skill, magic
 export function cueOf(tool: string, input: Record<string, unknown>, isOk: boolean): Mood | undefined {
   if (!isOk) return undefined
   if (tool === 'Bash' && typeof input.command === 'string') {
     return TESTS.test(input.command) || COMMIT.test(input.command) ? 'cool' : undefined
   }
   if (tool === 'ExitPlanMode') return 'idea'
+  if (tool === 'Skill') return 'magic'
   if (tool === 'TodoWrite' && Array.isArray(input.todos) && input.todos.length > 0) {
     const isFresh = input.todos.every(t => typeof t === 'object' && t !== null && (t as { status?: unknown }).status === 'pending')
     return isFresh ? 'idea' : undefined
@@ -271,7 +338,8 @@ export function isSmoking(idleTicks: number): boolean {
 }
 
 // What Clawd shows at tick `t`, given how long the session has been idle,
-// when a turn just ended how many ticks ago, and the moment it is having
+// when a turn just ended how many ticks ago, the moment it is having, and
+// how many ticks it has been reading
 export function view(
   t: number,
   idleTicks: number,
@@ -279,6 +347,7 @@ export function view(
   bodyColumns: number,
   since?: number,
   now?: Moment,
+  readingFor?: number,
 ): View {
   if (since !== undefined && since >= 0 && since < CELEBRATE_TICKS) {
     return { ...celebrating(since), x: 0, isWorking: true }
@@ -287,6 +356,10 @@ export function view(
     // It stops where it stood when the moment began, and walks on from there
     const x = isWorking ? walked(Math.max(0, t - now.since), WIDTH, bodyColumns) : 0
     return { ...moment(now), x, isWorking }
+  }
+  if (isWorking && readingFor !== undefined && readingFor >= 0) {
+    // It stops where it stood to read, and walks on from there after
+    return { ...reading(readingFor), x: walked(Math.max(0, t - readingFor), WIDTH, bodyColumns), isWorking }
   }
   if (isWorking) {
     const line = WORKING_LINES[Math.floor(t / 24) % WORKING_LINES.length]!

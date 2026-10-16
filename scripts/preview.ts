@@ -31,6 +31,8 @@ const MOODS: Mood[] = [
   { name: 'cool', about: 'pasan los tests o sale un commit: lentes de sol', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'cool', since: t % MOMENT_TICKS.cool }) },
   { name: 'cariño', about: 'le dices gracias: un corazón sobre su mano', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'love', since: t % MOMENT_TICKS.love }) },
   { name: 'idea', about: 'termina un plan: se le prende el foco', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'idea', since: t % MOMENT_TICKS.idea }) },
+  { name: 'magia', about: 'usa una skill: agita la varita y saltan chispas', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'magic', since: t % MOMENT_TICKS.magic }) },
+  { name: 'lee', about: 'lee varios archivos seguidos: lentes y libro', at: (t, c) => view(t, 0, true, c, undefined, undefined, t) },
   { name: 'agentes', about: 'con subagentes: cada uno llega con su notebook, teclea, y se va' },
 ]
 const POSES = MOODS.filter(m => m.at)

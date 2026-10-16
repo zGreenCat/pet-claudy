@@ -39,6 +39,8 @@ const SPEAK_TICKS = 12
 const RESULT_TICKS = 16
 
 const EYE_COLOR = '#1A1A1A'
+const BOOK_COLOR = '#3E3A7A'
+const PAGE_COLOR = '#E4DCCB'
 const DONE_COLOR = '#8DB360'
 const PALETTE = ['#6A9BCC', '#8DB360', '#C77DBB', '#D4A23C', '#5FB3A9', '#E07A5F']
 const MARKS = ['=>', '++', '{}', '</>', '()', '&&', ';;', '#!']
@@ -260,6 +262,13 @@ const CELL: Record<string, Cell> = {
   w: { ch: '●', style: { bg: 'claude', fg: EYE_COLOR } },
   // An eye shut tight
   m: { ch: '━', style: { bg: 'claude', fg: EYE_COLOR, bold: true } },
+  // A book: the pages' top, their edge against the spine, the cover, a page turning
+  '1': { ch: '▄', style: { fg: PAGE_COLOR } },
+  '2': { ch: '▐', style: { bg: PAGE_COLOR, fg: BOOK_COLOR } },
+  '3': { ch: ' ', style: { bg: BOOK_COLOR } },
+  '4': { ch: '▟', style: { fg: PAGE_COLOR } },
+  '5': { ch: '▄', style: { bg: 'claude', fg: PAGE_COLOR } },
+  '6': { ch: '▟', style: { bg: 'claude', fg: PAGE_COLOR } },
   // An arm at rest and raised, and a leg at either side of its cell
   '^': { ch: '▀', style: { fg: 'claude' } },
   v: { ch: '▄', style: { fg: 'claude' } },
