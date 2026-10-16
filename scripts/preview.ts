@@ -4,7 +4,7 @@
 //   node scripts/preview.ts todos    plays them in turn
 // Ctrl+C stops it. Not part of the mod: the engine loads only hooks/.
 
-import { CELEBRATE_TICKS, SLEEP_AFTER_TICKS, WIDTH, view } from '../hooks/clawd.ts'
+import { CELEBRATE_TICKS, MOMENT_TICKS, SLEEP_AFTER_TICKS, WIDTH, view } from '../hooks/clawd.ts'
 import type { Frame, View } from '../hooks/clawd.ts'
 import { ROWS, START_X, scene, solo, walk } from '../hooks/desks.ts'
 import type { Agent, Segment } from '../hooks/desks.ts'
@@ -28,6 +28,9 @@ const MOODS: Mood[] = [
   { name: 'celebra', about: 'terminó un turno: salta con los brazos arriba, confeti y "¡listo!"', at: (t, c) => view(t, 0, false, c, t % CELEBRATE_TICKS) },
   { name: 'fuma', about: 'un rato sin usarlo: un break con cigarro, de vez en cuando', at: (t, c) => view(t, 210, false, c) },
   { name: 'duerme', about: '3 minutos sin usarlo: zzz, sin animación', at: (t, c) => view(t, SLEEP_AFTER_TICKS, false, c) },
+  { name: 'cool', about: 'pasan los tests o sale un commit: lentes de sol', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'cool', since: t % MOMENT_TICKS.cool }) },
+  { name: 'cariño', about: 'le dices gracias: un corazón sobre su mano', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'love', since: t % MOMENT_TICKS.love }) },
+  { name: 'idea', about: 'termina un plan: se le prende el foco', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'idea', since: t % MOMENT_TICKS.idea }) },
   { name: 'agentes', about: 'con subagentes: cada uno llega con su notebook, teclea, y se va' },
 ]
 const POSES = MOODS.filter(m => m.at)

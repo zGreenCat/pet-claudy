@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { AgentStatus, Register } from 'claude-code'
 
 import type { Tick } from '../types'
-import { CELEBRATE_TICKS, TICK_MS, WIDTH, view, viewKey } from './clawd'
-import type { Frame } from './clawd'
+import { CELEBRATE_TICKS, TICK_MS, WIDTH, cueOf, isThanks, view, viewKey } from './clawd'
+import type { Frame, Moment, Mood } from './clawd'
 import { START_X, describe, oneLine, scene, solo, summary, walk } from './desks'
 import type { Agent, Segment } from './desks'
 
@@ -30,22 +30,26 @@ export const register: Register = on => {
   // The subagents at their desks, in seat order
   let agents: Agent[] = []
   let failures = 0
+  // The moment Clawd is having and the tick it began
+  let cue: { mood: Mood; at: number } | undefined
+
+  const now = (): Moment | undefined => (cue ? { mood: cue.mood, since: t - cue.at } : undefined)
 
   const isBusy = () => isWorking || agents.some(a => a.doneAt === undefined)
 
   function drawKey(): string {
-    if (agents.length === 0) return viewKey(view(t, idleTicks, isWorking, bodyColumns, t - finishedAt))
+    if (agents.length === 0) return viewKey(view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now()))
     return `T${JSON.stringify(desksScene())}`
   }
 
   function soloScene(): Segment[][] {
-    const v = view(t, idleTicks, isWorking, bodyColumns, t - finishedAt)
+    const v = view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now())
     return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns)
   }
 
   function desksScene() {
     // Clawd alone, not what it holds: the desks start right beside it
-    const frame = view(t, idleTicks, isBusy(), bodyColumns).frame.map(r => r.slice(0, WIDTH)) as Frame
+    const frame = view(t, idleTicks, isBusy(), bodyColumns, undefined, now()).frame.map(r => r.slice(0, WIDTH)) as Frame
     return scene(t, agents, frame, isWorking ? 'dirigiendo' : 'esperando', bodyColumns)
   }
 
@@ -109,14 +113,19 @@ export const register: Register = on => {
     return started
   }).catch(($, e, next) => next(e))
 
-  // Its bubble follows its tool calls
-  on('tool.call', ($, e, next) => {
+  // Its bubble follows its tool calls; a call that went well can give Clawd a
+  // moment (passing tests, a commit, a plan)
+  on('tool.call', async ($, e, next) => {
+    const input = e as unknown as Record<string, unknown>
     const a = e.agentId === undefined ? undefined : agents.find(x => x.id === e.agentId)
     if (a && a.doneAt === undefined) {
-      const activity = describe(e.tool, e as unknown as Record<string, unknown>)
+      const activity = describe(e.tool, input)
       agents = agents.map(x => (x === a ? { ...x, activity } : x))
     }
-    return next(e)
+    const answer = await next(e)
+    const mood = cueOf(e.tool, input, answer.deny === undefined && answer.isError !== true)
+    if (mood) cue = { mood, at: t }
+    return answer
   }).catch(($, e, next) => next(e))
 
   // A turn of the main loop that answered: Clawd cheers; a new prompt cuts it short
@@ -131,6 +140,7 @@ export const register: Register = on => {
 
   on('prompt.submit', ($, e, next) => {
     finishedAt = -CELEBRATE_TICKS
+    cue = isThanks(e.text) ? { mood: 'love', at: t } : undefined
     return next(e)
   }).catch(($, e, next) => next(e))
 

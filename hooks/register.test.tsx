@@ -129,3 +129,34 @@ test('a run of failed ticks is said once, and the clock keeps going', async ($, 
   await e.ticks(8)
   expect(await shows($, /✓ listo/)).toBe(true)
 })
+
+test('a thank-you in the prompt raises a heart', async ($, on) => {
+  const e = engine(on)
+  on('prompt.submit', ($, e) => ({ text: e.text }))
+  await start($)
+  await $.prompt.submit({ text: 'gracias!', wait: false, origin: { kind: 'composer' } })
+  // Clawd raises its arm first; the heart follows
+  expect(await shows($, /♥/)).toBe(false)
+  await e.ticks(6)
+  expect(await shows($, /♥/)).toBe(true)
+})
+
+test('tests that pass put on the sunglasses; tests that fail do not', async ($, on) => {
+  const e = engine(on)
+  let isError = false
+  on('classic.PreToolUse', () => ({}))
+  on('tool.call', () => (isError ? { isError: true, result: 'falló', text: 'falló' } : { result: { stdout: 'ok', stderr: '', interrupted: false }, text: 'ok' }))
+  await start($)
+
+  isError = true
+  await $.tool.call({ tool: 'Bash', command: 'npm test', description: 'Run tests' })
+  expect(await shows($, /todo en verde/)).toBe(false)
+
+  isError = false
+  await $.tool.call({ tool: 'Bash', command: 'npm test', description: 'Run tests' })
+  // The glasses go on first
+  await e.ticks(4)
+  expect(await shows($, /todo en verde/)).toBe(true)
+  await e.ticks(30)
+  expect(await shows($, /todo en verde/)).toBe(false)
+})

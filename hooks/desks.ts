@@ -250,6 +250,11 @@ const CELL: Record<string, Cell> = {
   '-': { ch: '▁', style: { bg: 'claude', fg: EYE_COLOR } },
   // Eyes of a mood, each its own glyph on the orange
   ...Object.fromEntries([...'><┓┏'].map(ch => [ch, { ch, style: { bg: 'claude', fg: EYE_COLOR, bold: true } }])),
+  // Sunglasses: the band, a lens, and each lens's inner edge
+  s: { ch: '▄', style: { bg: 'claude', fg: EYE_COLOR } },
+  S: { ch: '▀', style: { bg: 'claude', fg: EYE_COLOR } },
+  l: { ch: '▘', style: { bg: 'claude', fg: EYE_COLOR } },
+  r: { ch: '▝', style: { bg: 'claude', fg: EYE_COLOR } },
   // An arm at rest and raised, and a leg at either side of its cell
   '^': { ch: '▀', style: { fg: 'claude' } },
   v: { ch: '▄', style: { fg: 'claude' } },

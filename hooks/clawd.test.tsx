@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { CELEBRATE_TICKS, isSmoking, view, viewKey } from './clawd'
+import { CELEBRATE_TICKS, MOMENT_TICKS, cueOf, isSmoking, isThanks, view, viewKey } from './clawd'
 
 // How many times the drawing changes over `ticks` ticks (each change is a redraw)
 function changes(ticks: number, idleFrom: number, isWorking: boolean): number {
@@ -146,4 +146,50 @@ test('Clawd cheers over a turn that answered, not over a subagent', async ($, on
   ui = await $.ui.mount({ plugin: 'clawd-buddy', surface: 'terminal', ...band(false) })
   expect(await ui.find({ type: 'Text', text: /¡listo!/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('a moment shows over work for a few seconds, then lets go', () => {
+  // The glasses go up on the forehead, then down over the eyes
+  expect(view(10, 0, true, 80, undefined, { mood: 'cool', since: 0 }).frame[0]).toBe('vSSSSSSv')
+  const cool = view(10, 0, true, 80, undefined, { mood: 'cool', since: 4 })
+  expect(cool.line).toBe('todo en verde')
+  expect(cool.frame[0]).toBe('.ssssss.')
+  expect(view(10, 0, true, 80, undefined, { mood: 'cool', since: MOMENT_TICKS.cool }).line).not.toBe('todo en verde')
+  // A finished turn's cheer beats any moment
+  expect(view(10, 0, false, 80, 0, { mood: 'love', since: 0 }).line).toBe('¡listo!')
+
+  // An arm goes up before the heart shows, then the heart drifts over its head
+  const love = (since: number) => view(0, 0, true, 80, undefined, { mood: 'love', since })
+  const heart = (since: number) => love(since).marks.find(m => m.text === '♥')
+  expect(love(0).marks).toHaveLength(0)
+  expect(love(2).frame[0]).toBe('vOLOORO.')
+  expect(love(2).marks.map(m => m.text)).toEqual(['▗'])
+  expect(heart(4)).toBeUndefined()
+  expect(heart(15)!.x).toBeGreaterThan(heart(6)!.x)
+
+  // A hand to the head while the bulb comes on dim, then it lights with rays
+  const idea = (since: number) => view(0, 0, true, 80, undefined, { mood: 'idea', since })
+  const bulb = (since: number) => idea(since).marks.filter(m => m.fg !== 'claude').map(m => m.text).join('')
+  expect(idea(0).frame[0]).toBe('.O┓OO┏Ov')
+  expect(bulb(0)).toBe('')
+  expect(bulb(2)).toBe('●')
+  expect(bulb(4)).toContain('\\')
+  expect(bulb(6)).toBe('●')
+})
+
+test('thanks, passing tests, commits and fresh plans earn a moment', () => {
+  expect(isThanks('muchas gracias!')).toBe(true)
+  expect(isThanks('Thanks <3')).toBe(true)
+  expect(isThanks('arregla el bug')).toBe(false)
+
+  expect(cueOf('Bash', { command: 'npm test' }, true)).toBe('cool')
+  expect(cueOf('Bash', { command: 'pnpm run test -- --watch=false' }, true)).toBe('cool')
+  expect(cueOf('Bash', { command: 'git commit -m "fix"' }, true)).toBe('cool')
+  expect(cueOf('Bash', { command: 'npm test' }, false)).toBeUndefined()
+  expect(cueOf('Bash', { command: 'ls tests/' }, true)).toBeUndefined()
+
+  expect(cueOf('ExitPlanMode', {}, true)).toBe('idea')
+  expect(cueOf('TodoWrite', { todos: [{ status: 'pending' }, { status: 'pending' }] }, true)).toBe('idea')
+  expect(cueOf('TodoWrite', { todos: [{ status: 'completed' }, { status: 'pending' }] }, true)).toBeUndefined()
+  expect(cueOf('Read', { file_path: 'a.ts' }, true)).toBeUndefined()
 })

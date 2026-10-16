@@ -24,6 +24,8 @@ const SMOKE_TICKS = 40
 //   L  orange cell, a dark eye in its lower left quarter; R the lower right
 //   -  orange cell with a closed eye (▁)
 //   > <  eyes squeezed with joy; ┓ ┏ half shut, at ease.
+//   s  sunglasses' band, the cell's lower half; S a lens, its upper half;
+//      l and r a lens's inner edge, the upper left or right quarter
 //        Each eye is ASCII or a box-drawing glyph: terminals draw those
 //        themselves, so they read the same whatever the font
 //   ^  an arm at rest, the cell's upper half; v an arm raised, its lower half
@@ -47,6 +49,22 @@ const HEAD_DRAW = '.O-OO-OcccY'
 // Cheering: eyes squeezed with joy, the arms going up and down
 const HEAD_CHEER = 'vO>OO<Ov'
 const HEAD_JOY = '.O>OO<O.'
+// Cool: sunglasses, a dark band across the face and two wide lenses below it.
+// First held up on the forehead, arms raised, then pulled down over the eyes
+const HEAD_GLASSES_UP = 'vSSSSSSv'
+const HEAD_GLASSES_DOWN = 'vssssssv'
+const BODY_GLASSES_DOWN = '.OSlrSO.'
+const HEAD_COOL = '.ssssss.'
+const BODY_COOL = '^OSlrSO^'
+// Love: one arm raised to hold up a heart, eyes squeezed
+const HEAD_ARM_UP = 'vOLOORO.'
+const HEAD_LOVE = 'vO>OO<O.'
+const BODY_ARM_UP = '.OOOOOO^'
+// An idea: a hand to the head and eyes half shut while it thinks, then the
+// other arm pointing up at the bulb
+const HEAD_THINK = '.O┓OO┏Ov'
+const HEAD_POINT = '.OLOOROv'
+const BODY_HAND_UP = '^OOOOOO.'
 
 export type Frame = [string, string, string]
 
@@ -137,6 +155,82 @@ function smoking(t: number): { frame: Frame; marks: Mark[] } {
   return { frame: [isDrawing ? HEAD_DRAW : HEAD_SMOKE, BODY, LEGS], marks }
 }
 
+// A moment: something went well, someone said thanks, a plan came together.
+// It shows for a few seconds over whatever Clawd was doing, then lets go
+export type Mood = 'cool' | 'love' | 'idea'
+export type Moment = { mood: Mood; since: number }
+export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 16, idea: 16 }
+const HEART = '#E5484D'
+const BULB = '#F2C14E'
+const BULB_OFF = '#B8BCC4'
+
+// A raised arm's hand, a quarter cell up in the air over it, so the arm reads
+// as reaching up and not just lifted
+const CLAWD = 'claude'
+const LEFT_HAND: Mark = { row: 0, x: 0, text: '▗', fg: CLAWD }
+const RIGHT_HAND: Mark = { row: 0, x: 7, text: '▖', fg: CLAWD }
+
+// Each moment is a short scene: Clawd does something, and what it holds or
+// sees comes of it
+function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string; x?: number } {
+  const s = m.since
+  const hop = s % 4 < 2 ? LEGS : LEGS_STEP
+  switch (m.mood) {
+    case 'cool':
+      // Glasses up on the forehead, pulled down, then a slow cool sway
+      if (s < 2) return { frame: [HEAD_GLASSES_UP, BODY_ARMS_UP, LEGS], marks: [LEFT_HAND, RIGHT_HAND], line: 'momento…' }
+      if (s < 4) return { frame: [HEAD_GLASSES_DOWN, BODY_GLASSES_DOWN, LEGS], marks: [LEFT_HAND, RIGHT_HAND], line: 'momento…' }
+      return { frame: [HEAD_COOL, BODY_COOL, LEGS], marks: [], line: 'todo en verde', x: Math.floor(s / 4) % 2 }
+    case 'love': {
+      // It notices, raises an arm, a spark in its hand turns into a heart, and
+      // the heart drifts over its head while it hops
+      if (s < 2) return { frame: IDLE, marks: [], line: '¿eh?' }
+      if (s < 4) return { frame: [HEAD_ARM_UP, BODY_ARM_UP, LEGS], marks: [LEFT_HAND], line: '…' }
+      if (s < 6) return { frame: [HEAD_ARM_UP, BODY_ARM_UP, LEGS], marks: [LEFT_HAND, { row: 0, x: 1, text: '·', fg: HEART }], line: '…' }
+      const x = Math.min(3, 1 + Math.floor((s - 6) / 3))
+      return { frame: [HEAD_LOVE, BODY_ARM_UP, hop], marks: [LEFT_HAND, { row: 0, x, text: '♥', fg: HEART }], line: '¡de nada!' }
+    }
+    case 'idea': {
+      // A hand to the head and the bulb comes on dim; then both arms up as it
+      // lights; then it points at it, the rays coming and going
+      if (s < 4) {
+        const marks: Mark[] = s < 2 ? [] : [{ row: 0, x: 4, text: '●', fg: BULB_OFF }]
+        return { frame: [HEAD_THINK, BODY_HAND_UP, LEGS], marks, line: 'mmm…' }
+      }
+      const rays: Mark[] = s % 4 < 2 ? [{ row: 0, x: 3, text: '\\', fg: BULB }, { row: 0, x: 5, text: '/', fg: BULB }] : []
+      const bulb: Mark = { row: 0, x: 4, text: '●', fg: BULB }
+      if (s < 6) return { frame: [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS_STEP], marks: [LEFT_HAND, RIGHT_HAND, bulb, ...rays], line: '¡!' }
+      return { frame: [HEAD_POINT, BODY_HAND_UP, hop], marks: [RIGHT_HAND, bulb, ...rays], line: '¡idea!' }
+    }
+  }
+}
+
+const THANKS = /\b(gracias|grax|thanks|thank you|thx)\b|<3|❤|♥/i
+// A command that runs a test suite, not one that only names a tests folder
+const TESTS = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\b(go|cargo|deno|bun|plugin|make)\s+test\b|\b(vitest|jest|pytest|mocha|rspec|phpunit)\b/
+const COMMIT = /\bgit\s+(commit|push)\b/
+
+// Whether a prompt thanks Claude
+export function isThanks(text: string): boolean {
+  return THANKS.test(text)
+}
+
+// The moment a finished tool call earns, if any: tests that pass or a commit
+// that lands, cool; a plan just made (ExitPlanMode, or a todo list with
+// nothing started yet), an idea
+export function cueOf(tool: string, input: Record<string, unknown>, isOk: boolean): Mood | undefined {
+  if (!isOk) return undefined
+  if (tool === 'Bash' && typeof input.command === 'string') {
+    return TESTS.test(input.command) || COMMIT.test(input.command) ? 'cool' : undefined
+  }
+  if (tool === 'ExitPlanMode') return 'idea'
+  if (tool === 'TodoWrite' && Array.isArray(input.todos) && input.todos.length > 0) {
+    const isFresh = input.todos.every(t => typeof t === 'object' && t !== null && (t as { status?: unknown }).status === 'pending')
+    return isFresh ? 'idea' : undefined
+  }
+  return undefined
+}
+
 export function isSmoking(idleTicks: number): boolean {
   return (
     idleTicks >= SMOKE_FROM_TICKS &&
@@ -145,17 +239,21 @@ export function isSmoking(idleTicks: number): boolean {
   )
 }
 
-// What Clawd shows at tick `t`, given how long the session has been idle and,
-// when a turn just ended, how many ticks ago
+// What Clawd shows at tick `t`, given how long the session has been idle,
+// when a turn just ended how many ticks ago, and the moment it is having
 export function view(
   t: number,
   idleTicks: number,
   isWorking: boolean,
   bodyColumns: number,
   since?: number,
+  now?: Moment,
 ): View {
   if (since !== undefined && since >= 0 && since < CELEBRATE_TICKS) {
     return { ...celebrating(since), x: 0, isWorking: true }
+  }
+  if (now && now.since >= 0 && now.since < MOMENT_TICKS[now.mood]) {
+    return { x: 0, ...moment(now), isWorking }
   }
   if (isWorking) {
     const line = WORKING_LINES[Math.floor(t / 24) % WORKING_LINES.length]!
