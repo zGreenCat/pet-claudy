@@ -36,6 +36,7 @@ const MOODS: Mood[] = [
   { name: 'súper', about: 'lanza varios subagentes a la vez: capa y puño arriba', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'super', since: t % MOMENT_TICKS.super }) },
   { name: 'café', about: 'un rato sin usarlo, otro break: una taza de café', at: (t, c) => view(t, 450, false, c) },
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: (t, c) => view(t, 0, true, c, undefined, undefined, undefined, 8 + t) },
+  { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
   { name: 'agentes', about: 'con subagentes: cada uno llega con su notebook, teclea, y se va' },
 ]
 const POSES = MOODS.filter(m => m.at)

@@ -208,3 +208,25 @@ test('a long command puts the headphones on until it ends', async ($, on) => {
   await call
   expect(await shows($, /musiquita/)).toBe(false)
 })
+
+test('three failures in a row leave Clawd dizzy; one that works resets the count', async ($, on) => {
+  const e = engine(on)
+  let isError = true
+  on('classic.PreToolUse', () => ({}))
+  on('tool.call', () => (isError ? { isError: true, result: 'falló', text: 'falló' } : { result: { stdout: '', stderr: '', interrupted: false }, text: '' }))
+  await start($)
+
+  const run = () => $.tool.call({ tool: 'Bash', command: 'ls', description: 'List' })
+  await run()
+  await run()
+  isError = false
+  await run()
+  isError = true
+  await run()
+  await run()
+  await e.ticks(2)
+  expect(await shows($, /mareado/)).toBe(false)
+  await run()
+  await e.ticks(2)
+  expect(await shows($, /mareado/)).toBe(true)
+})

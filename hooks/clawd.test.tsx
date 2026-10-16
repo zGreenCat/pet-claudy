@@ -282,3 +282,20 @@ test('a long command puts the headphones on, notes drifting up', () => {
   // The foot taps
   expect(at(8).frame[2]).not.toBe(at(10).frame[2])
 })
+
+test('dizzy: a start, spinning eyes and a sway, a fall upside down, then it gets up', () => {
+  const at = (since: number) => view(10 + since, 0, false, 80, undefined, { mood: 'dizzy', since })
+  expect(at(0).frame[0]).toBe('.OwOOwO.')
+  expect(at(2).frame[0]).toBe('.O@OO@O.')
+  expect(at(2).line).toBe('mareado…')
+  // It sways, and the stars go round
+  expect(new Set([2, 4, 6].map(s => at(s).x)).size).toBe(2)
+  expect(at(2).marks[0]!.x).not.toBe(at(3).marks[0]!.x)
+  // It loses its balance and falls upside down, legs kicking in the air
+  expect(at(12).line).toBe('¡uy!')
+  expect(at(14).frame).toEqual(['.yy..zz.', 'vOOOOOOv', '.O@OO@O.'])
+  expect(at(16).frame[0]).not.toBe(at(14).frame[0])
+  // It gets up, blinks, and its eyes come back
+  expect(at(24).frame[0]).toBe('.O-OO-O.')
+  expect(at(28).frame[0]).toBe('.OLOORO.')
+})

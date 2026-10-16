@@ -264,6 +264,10 @@ const CELL: Record<string, Cell> = {
   // Eyes looking up, and eyes wide open
   p: { ch: '°', style: { bg: 'claude', fg: EYE_COLOR, bold: true } },
   w: { ch: '●', style: { bg: 'claude', fg: EYE_COLOR } },
+  '@': { ch: '@', style: { bg: 'claude', fg: EYE_COLOR, bold: true } },
+  // A leg sticking up, upside down
+  y: { ch: '▖', style: { fg: 'claude' } },
+  z: { ch: '▗', style: { fg: 'claude' } },
   // An eye shut tight
   m: { ch: '━', style: { bg: 'claude', fg: EYE_COLOR, bold: true } },
   // A book: the pages' top, their edge against the spine, the cover, a page turning

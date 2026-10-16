@@ -4,6 +4,7 @@ import type { AgentStatus, Register } from 'claude-code'
 import type { Tick } from '../types'
 import {
   CELEBRATE_TICKS,
+  ERRORS_TO_DIZZY,
   READING_LINGER_TICKS,
   READS_TO_START,
   READS_WINDOW_TICKS,
@@ -57,6 +58,8 @@ export const register: Register = on => {
   const runningFor = () => (runningFrom === undefined ? undefined : t - runningFrom)
   // The ticks recent subagents were spawned
   let spawns: number[] = []
+  // The main loop's tool calls that failed in a row
+  let errors = 0
 
   const isBusy = () => isWorking || agents.some(a => a.doneAt === undefined)
 
@@ -105,7 +108,11 @@ export const register: Register = on => {
           for (const a of waiting) {
             const info = list.find(i => i.id === a.id)
             if (!info) finish(a.id, 'listo')
-            else if (ENDED[info.status]) finish(a.id, ENDED[info.status]!)
+            else if (ENDED[info.status]) {
+              finish(a.id, ENDED[info.status]!)
+              // A subagent that failed or was stopped leaves Clawd dizzy
+              if (info.status !== 'completed') cue = { mood: 'dizzy', at: t }
+            }
           }
         }
 
@@ -173,8 +180,14 @@ export const register: Register = on => {
         if (running === 0) runningFrom = undefined
       }
     }
-    const mood = cueOf(e.tool, input, answer.deny === undefined && answer.isError !== true)
+    const isOk = answer.deny === undefined && answer.isError !== true
+    const mood = cueOf(e.tool, input, isOk)
     if (mood) cue = { mood, at: t }
+    // Failure after failure leaves it dizzy
+    if (e.agentId === undefined) {
+      errors = isOk ? 0 : errors + 1
+      if (errors === ERRORS_TO_DIZZY) cue = { mood: 'dizzy', at: t }
+    }
     return answer
   }).catch(($, e, next) => next(e))
 

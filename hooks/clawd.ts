@@ -26,7 +26,8 @@ const SMOKE_TICKS = 40
 //   > <  eyes squeezed with joy; ┓ ┏ half shut, at ease.
 //   s  sunglasses' band, the cell's lower half; S a lens, its upper half;
 //      l and r a lens's inner edge, the upper left or right quarter
-//   p  an eye looking up (°); w an eye wide open (●)
+//   p  an eye looking up (°); w an eye wide open (●); @ an eye spinning, dizzy
+//   y z  a leg sticking up, upside down, left or right
 //   m  an eye shut tight (━), for a face sunk half a cell
 //   1 2 3  a book held low at its side, in front of its arm and body: a small light L of pages (1 their top,
 //        2 their edge with the cover's spine beside it) inside the long blue
@@ -104,6 +105,12 @@ const SPELL_ROOM = '............'
 // An idea: eyes up at the bulb, then wide open at the thought
 const HEAD_LOOK_UP = '.OpOOpO.'
 const HEAD_WIDE = '.OwOOwO.'
+// Dizzy: eyes spinning; losing its balance, sunk half a cell; then fallen
+// upside down, legs kicking in the air and its head on the ground
+const HEAD_DIZZY = '.O@OO@O.'
+const BODY_SINKING = 'vO@OO@Ov'
+const FALLEN: Frame = ['.yy..zz.', 'vOOOOOOv', HEAD_DIZZY]
+const FALLEN_KICK: Frame = ['.zz..yy.', 'vOOOOOOv', HEAD_DIZZY]
 
 export type Frame = [string, string, string]
 
@@ -202,9 +209,9 @@ function smoking(t: number): { frame: Frame; marks: Mark[] } {
 
 // A moment: something went well, someone said thanks, a plan came together.
 // It shows for a few seconds over whatever Clawd was doing, then lets go
-export type Mood = 'cool' | 'love' | 'idea' | 'magic' | 'super'
+export type Mood = 'cool' | 'love' | 'idea' | 'magic' | 'super' | 'dizzy'
 export type Moment = { mood: Mood; since: number }
-export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 20, idea: 16, magic: 16, super: 24 }
+export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 20, idea: 16, magic: 16, super: 24, dizzy: 32 }
 const HEART = '#E5484D'
 const BULB = '#F2C14E'
 // A wooden wand with a white tip
@@ -257,7 +264,7 @@ function heart(picture: string[]): Mark[] {
 }
 
 // Each moment is a short scene Clawd acts out
-function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string } {
+function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string; dx?: number } {
   const s = m.since
   switch (m.mood) {
     case 'cool':
@@ -312,6 +319,24 @@ function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string } {
       // The cape and collar come on; then a fist goes up and the cape flaps
       if (s < 4) return { frame: [HEAD, BODY_SUPER, CAPE_DOWN], marks: [], line: '¡súper!' }
       return { frame: [HEAD_ARM_LIFTED, BODY_SUPER_FIST, capeWave(Math.floor(s / 2))], marks: [], line: '¡súper Clawd!' }
+    case 'dizzy': {
+      // A start, eyes wide; then eyes spinning while it sways side to side
+      // under circling stars; it loses its balance and falls upside down, legs
+      // kicking; then it gets up, blinks, and shakes it off
+      const stars: Mark[] = [
+        { row: 0, x: 1 + (s % 6), text: '*', fg: BULB },
+        { row: 0, x: 1 + ((s + 3) % 6), text: '·', fg: BULB },
+      ]
+      if (s < 2) return { frame: [HEAD_WIDE, BODY, LEGS], marks: [], line: '¿eh?' }
+      if (s < 12) {
+        const sway = Math.floor(s / 2) % 2
+        return { frame: [HEAD_DIZZY, BODY, sway ? LEGS_STEP : LEGS], marks: stars, line: 'mareado…', dx: sway }
+      }
+      if (s < 14) return { frame: [HEAD_BREATH.slice(0, 8), BODY_SINKING, LEGS], marks: stars, line: '¡uy!', dx: 1 }
+      if (s < 24) return { frame: (s - 14) % 4 < 2 ? FALLEN : FALLEN_KICK, marks: stars, line: 'ay…' }
+      if (s < 28) return { frame: [s < 26 ? HEAD_BLINK : HEAD, BODY, LEGS], marks: [], line: 'uf…', dx: s % 2 }
+      return { frame: IDLE, marks: [], line: 'uf…' }
+    }
   }
 }
 
@@ -360,6 +385,8 @@ export const READING_LINGER_TICKS = 12
 export const MUSIC_AFTER_TICKS = 8
 // Subagents spawned within this many ticks of each other make Clawd super
 export const SUPER_WINDOW_TICKS = 8
+// Tool calls of the main loop that fail in a row before Clawd gets dizzy
+export const ERRORS_TO_DIZZY = 3
 
 export function isRead(tool: string): boolean {
   return READS.has(tool)
@@ -419,7 +446,8 @@ export function view(
   if (now && now.since >= 0 && now.since < MOMENT_TICKS[now.mood]) {
     // It stops where it stood when the moment began, and walks on from there
     const x = isWorking ? walked(Math.max(0, t - now.since), WIDTH, bodyColumns) : 0
-    return { ...moment(now), x, isWorking }
+    const { dx = 0, ...scene } = moment(now)
+    return { ...scene, x: x + dx, isWorking }
   }
   if (isWorking && readingFor !== undefined && readingFor >= 0) {
     // It stops where it stood to read, and walks on from there after
