@@ -219,6 +219,10 @@ export const register: Register = on => {
       return next(e)
     }
 
+    // AbovePrompt is shared. Keep the rest of the render chain alive and
+    // give downstream plugins the space left after our four-row scene.
+    const below = await next({ ...e, props: { ...e.props, maxRows: e.props.maxRows - 4 } })
+
     // Read so a write of the key redraws this band
     await read($, tick)
     if (e.props.isWorking) idleTicks = 0
@@ -252,6 +256,7 @@ export const register: Register = on => {
             )}
           </Text>
         ))}
+        {below}
       </Box>
     )
   })

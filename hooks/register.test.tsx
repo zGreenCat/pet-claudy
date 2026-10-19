@@ -16,6 +16,42 @@ const band = {
   },
 }
 
+test('AbovePrompt preserves image controls and passes on the remaining row budget', async ($, on) => {
+  let available: number | undefined
+  let calls = 0
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    calls += 1
+    available = e.props.maxRows
+    const { Text } = $.ui.resolve(e)
+    return <Text>[Image #1] hover to preview</Text>
+  })
+  const ui = await $.ui.mount({ plugin: 'clawd-buddy', surface: 'terminal', ...band })
+  expect(await ui.find({ type: 'Text', text: /\[Image #1\]/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /[▖▗]/ })).toBeDefined()
+  expect(available).toBe(6)
+  expect(calls).toBe(1)
+  await ui.unmount()
+})
+
+for (const maxRows of [0, 1, 3]) {
+  test(`AbovePrompt gives all ${maxRows} rows to other plugins on a short screen`, async ($, on) => {
+    let available: number | undefined
+    on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+      available = e.props.maxRows
+      const { Text } = $.ui.resolve(e)
+      return <Text>[Image #1]</Text>
+    })
+    const ui = await $.ui.mount({
+      plugin: 'clawd-buddy', surface: 'terminal', ...band,
+      props: { ...band.props, maxRows },
+    })
+    expect(await ui.find({ type: 'Text', text: /\[Image #1\]/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /[▖▗]/ })).toBeUndefined()
+    expect(available).toBe(maxRows)
+    await ui.unmount()
+  })
+}
+
 const info = (id: string, status: AgentStatus): AgentInfo => ({ id, description: '', type: 'Explore', status })
 
 // The Agent tool's call as the engine raises it, with the task's description
@@ -33,6 +69,10 @@ const spawnOf = (description: string): AgentSpawnInput => ({
 // The engine beneath the plugin: a clock the test moves, a spawn that starts
 // agent `a1`, and an agent list the test sets
 function engine(on: On) {
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
   const clock = mock.clock(on)
   let list: AgentInfo[] | Error = [info('a1', 'running')]
   on('session.start', ($, e) => ({ cwd: e.cwd }))

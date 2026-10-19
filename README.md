@@ -32,6 +32,11 @@ node scripts/preview.ts todos    # play them in turn
 
 ## Develop
 
+Clawd shares the area above the prompt with other plugins, including image-preview.
+It preserves their rendered content and reserves four rows for its scene when
+passing the remaining row budget along. With fewer than four available rows or
+a survey, Clawd steps aside.
+
 ```
 claude plugin validate .
 claude plugin test .

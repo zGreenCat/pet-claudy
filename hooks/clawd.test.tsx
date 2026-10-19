@@ -67,7 +67,11 @@ const band = (isWorking: boolean) => ({
   },
 })
 
-test('Clawd draws above the prompt, idle and working', async $ => {
+test('Clawd draws above the prompt, idle and working', async ($, on) => {
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
   for (const surface of ['terminal', 'desktop'] as const) {
     for (const isWorking of [false, true]) {
       const ui = await $.ui.mount({ plugin: 'clawd-buddy', surface, ...band(isWorking) })
@@ -95,6 +99,10 @@ test('Clawd steps aside for a survey', async ($, on) => {
 })
 
 test('a subagent sits down at its desk beside Clawd', async ($, on) => {
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
   // Nothing beneath the plugin answers these events in a test
   on('agent.spawn', () => ({ model: 'haiku', agentId: 'a1' }))
   on('classic.SubagentStop', () => ({}))
@@ -134,6 +142,10 @@ test('a finished turn makes Clawd cheer, then settle, then go back to waiting', 
 })
 
 test('Clawd cheers over a turn that answered, not over a subagent', async ($, on) => {
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
   on('turn.complete', () => ({ text: '' }))
   const done = { answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' as const }
 
