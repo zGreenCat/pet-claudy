@@ -1,6 +1,10 @@
 # Plan: Clawd Invaders
 
-Estado: diseño propuesto; juego todavía sin implementar.
+Estado: implementado en `hooks/game*.ts(x)` (v0.11.0). Verificado en el motor:
+panel, `Client`, teclas, pausa por foco y tamaño, y reglas, con `claude plugin test`.
+Pendiente de comprobar a mano en una sesión real: lado y ancho reales del panel,
+`/clawd-play` durante un turno activo, Escape y retorno de foco, y convivencia con
+image-preview. Sin indicador de atención/permisos: no hay señal verificada.
 
 ## Objetivo
 

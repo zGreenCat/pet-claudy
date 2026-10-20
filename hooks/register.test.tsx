@@ -76,6 +76,7 @@ function engine(on: On) {
   const clock = mock.clock(on)
   let list: AgentInfo[] | Error = [info('a1', 'running')]
   on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('command.register', () => ({ value: undefined }))
   on('agent.spawn', () => ({ model: 'haiku', agentId: 'a1' }))
   on('agent.list', () => {
     return list instanceof Error ? { deny: list.message } : { value: list }

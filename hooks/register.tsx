@@ -20,6 +20,7 @@ import {
 import type { Frame, Moment, Mood } from './clawd'
 import { START_X, describe, oneLine, scene, solo, summary, walk } from './desks'
 import type { Agent, Segment } from './desks'
+import { registerGame, registerGameCommand, trackPrompt, trackTurn } from './game-register'
 
 // The view key last drawn. The timer only writes it when what Clawd shows
 // changes, so a still Clawd costs no redraws.
@@ -32,7 +33,9 @@ const RECONCILE_TICKS = 8
 // Failed ticks before Clawd says so, once a session: one alone is let pass
 const FAILURES_TO_REPORT = 5
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  registerGame(on, options)
+
   // Module state: the clock, and what the last draw saw of the band
   let t = 0
   let idleTicks = 0
@@ -131,6 +134,13 @@ export const register: Register = on => {
       }
     })
 
+    try {
+      await registerGameCommand($)
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
+      $.ui.toast(`clawd-buddy: /clawd-play no está disponible (${reason})`)
+    }
+
     return next(e)
   })
 
@@ -192,7 +202,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   // A turn of the main loop that answered: Clawd cheers; a new prompt cuts it short
-  on('turn.complete', ($, e, next) => {
+  on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined && e.reason === 'answer') {
       finishedAt = t
       isWorking = false
@@ -200,12 +210,14 @@ export const register: Register = on => {
       reads = []
       readingFrom = undefined
     }
+    await trackTurn($, e)
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  on('prompt.submit', ($, e, next) => {
+  on('prompt.submit', async ($, e, next) => {
     finishedAt = -CELEBRATE_TICKS
     cue = isThanks(e.text) ? { mood: 'love', at: t } : undefined
+    await trackPrompt($, e)
     return next(e)
   }).catch(($, e, next) => next(e))
 
