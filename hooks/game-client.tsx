@@ -1,8 +1,13 @@
-// Clawd Invaders' surface module: it keeps the games, the key listener and the
-// one clock of the instance, and draws the board. Without the keyboard the
-// pane plays a demo on autopilot, so it shows what it is; with it, the player's
-// game runs. Losing the keyboard pauses the player's game, and playing again
-// is explicit.
+// Clawd Invaders' surface module: it keeps the games, the key and pointer
+// listeners and the one clock of the instance, and draws the board. Without
+// the keyboard the pane plays a demo on autopilot, so it shows what it is;
+// with it, the player's game runs.
+//
+// Two things hand the game the keyboard: the pane's own focus (ctrl+x tab, or
+// the open asking for it) and a click on the game, which gives this Client the
+// keys while the pane's isFocused stays false. No event says when a click's
+// focus ends (Escape returns it unseen), so a game that hears no key for a
+// while pauses itself, and playing again is explicit.
 
 import type { ClientSurface } from 'claude-code'
 
@@ -23,11 +28,13 @@ const MAX_W = 44
 const MAX_H = 20
 // Ticks the demo shows its lost game before it plays another
 const DEMO_RESTART_TICKS = 20
+// Ticks of play without a key before the game takes the keyboard for gone
+export const IDLE_PAUSE_TICKS = Math.round(12_000 / STEP_MS)
 const HEART = '#E5484D'
 
 export type Props = { isFocused: boolean; claude: ClaudeState }
 
-type Local = {
+export type Local = {
   props: Props
   // The player's game, from the first time the pane has the keyboard
   play?: Game
@@ -36,8 +43,10 @@ type Local = {
   isPaused: boolean
   // The board size the games were last laid out for
   size: { w: number; h: number }
-  stopClock?: () => void
-  startClock?: () => void
+  // True from a click on the game or a key it heard, until it hears none for
+  // IDLE_PAUSE_TICKS
+  hasKeys: boolean
+  idleTicks: number
 }
 
 const CLAUDE_LINE: Record<ClaudeState, string> = {
@@ -48,17 +57,19 @@ const CLAUDE_LINE: Record<ClaudeState, string> = {
 
 const seed = () => Math.floor(Math.random() * 4294967296)
 
-// The demo plays whenever the pane has no keyboard and no game of the
+const hasKeyboard = (s: Local) => s.props.isFocused || s.hasKeys
+
+// The demo plays whenever the game has no keyboard and no game of the
 // player's is waiting on it
-const isDemo = (s: Local) => !s.props.isFocused && s.play?.status !== 'playing'
+const isDemo = (s: Local) => !hasKeyboard(s) && s.play?.status !== 'playing'
 
 const shouldRun = (s: Local) => {
   if (!fits(s.size.w, s.size.h)) return false
   if (isDemo(s)) return s.demo !== undefined
-  return s.props.isFocused && !s.isPaused && s.play?.status === 'playing'
+  return hasKeyboard(s) && !s.isPaused && s.play?.status === 'playing'
 }
 
-function advance(s: Local) {
+export function advance(s: Local) {
   if (isDemo(s) && s.demo) {
     if (s.demo.status === 'over') {
       s.demoOverFor += 1
@@ -71,6 +82,11 @@ function advance(s: Local) {
     }
   } else if (s.play) {
     s.play = step(s.play)
+    s.idleTicks += 1
+    if (s.idleTicks >= IDLE_PAUSE_TICKS) {
+      s.hasKeys = false
+      s.isPaused = true
+    }
   }
 }
 
@@ -80,10 +96,10 @@ function message(s: Local, g: Game): Line[] {
     return [
       { text: g.cause === 'invaded' ? '¡Los bugs llegaron!' : '¡Sin vidas!', fg: HEART, bold: true },
       { text: `Puntos: ${g.score}` },
-      { text: s.props.isFocused ? 'Enter: otra vez' : 'Clic para jugar otra' },
+      { text: hasKeyboard(s) ? 'Enter: otra vez' : 'Clic para jugar otra' },
     ]
   }
-  if (!s.props.isFocused) return [{ text: 'Pausa', bold: true }, { text: 'Clic para seguir' }]
+  if (!hasKeyboard(s)) return [{ text: 'Pausa', bold: true }, { text: 'Clic para seguir' }]
   if (s.isPaused && g.t === 0) {
     return [
       { text: 'CLAWD INVADERS', fg: ORANGE, bold: true },
@@ -99,9 +115,10 @@ function message(s: Local, g: Game): Line[] {
 export default function GameClient(props: Props, surface: ClientSurface<Local>) {
   const { Box, Text } = surface.elements
   const first = surface.state === undefined
-  const s: Local = surface.state ?? { props, demoOverFor: 0, isPaused: true, size: { w: 0, h: 0 } }
+  const s: Local =
+    surface.state ?? { props, demoOverFor: 0, isPaused: true, size: { w: 0, h: 0 }, hasKeys: false, idleTicks: 0 }
   s.props = props
-  if (!props.isFocused) {
+  if (!hasKeyboard(s)) {
     s.isPaused = true
     if (s.play?.status === 'over') s.play = undefined
   }
@@ -117,35 +134,42 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
     }
     s.isPaused = true
   }
-  if (props.isFocused && !s.play && fits(s.size.w, s.size.h)) {
+  const ensurePlay = () => {
+    if (s.play || !fits(s.size.w, s.size.h)) return
     s.play = newGame(s.size.w, s.size.h, seed())
     s.isPaused = true
   }
+  if (hasKeyboard(s)) ensurePlay()
 
   if (first) {
     surface.setState(s)
     const redraw = () => surface.setState(s)
 
-    // The clock runs only while a game plays: it stops itself on the first
-    // tick that finds nothing to play, and a key or the demo starts it again
-    const tick = () => {
-      if (!shouldRun(s)) {
-        s.stopClock?.()
-        s.stopClock = undefined
-        return
-      }
+    // One clock for the instance, started once as the engine asks; a paused
+    // game's tick does nothing and draws nothing
+    surface.every(STEP_MS, () => {
+      if (!shouldRun(s)) return
       advance(s)
       redraw()
-    }
-    s.startClock = () => {
-      if (s.stopClock === undefined && shouldRun(s)) s.stopClock = surface.every(STEP_MS, tick)
-    }
+    })
+
+    surface.onPointer(({ type }) => {
+      if (type !== 'down' || s.hasKeys) return
+      s.hasKeys = true
+      s.idleTicks = 0
+      ensurePlay()
+      redraw()
+    })
 
     surface.onKey(({ key, ctrl, meta }) => {
+      if (ctrl || meta) return
+      s.hasKeys = true
+      s.idleTicks = 0
+      ensurePlay()
       const g = s.play
-      if (ctrl || meta || !g || !fits(s.size.w, s.size.h)) return
+      if (!g || !fits(s.size.w, s.size.h)) return redraw()
       if (g.status === 'over') {
-        if (key !== 'return' && key !== ' ' && key !== 'r') return
+        if (key !== 'return' && key !== ' ' && key !== 'r') return redraw()
         s.play = newGame(s.size.w, s.size.h, seed())
         s.isPaused = false
       } else if (key === 'p') {
@@ -158,14 +182,10 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
         s.isPaused = false
       } else if (key === 'return' || key === ' ') {
         s.isPaused = false
-      } else {
-        return
       }
-      s.startClock?.()
       redraw()
     })
   }
-  s.startClock?.()
 
   if (s.size.w <= 0 || s.size.h <= 0) return <Text dimColor>Clawd Invaders…</Text>
 
@@ -185,7 +205,7 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
 
   const margin = ' '.repeat(Math.max(0, Math.floor((surface.columns - (s.size.w + 2)) / 2)))
   const above = Math.max(0, Math.floor((surface.rows - (s.size.h + FRAME_ROWS)) / 2))
-  const hint = props.isFocused ? 'Esc: prompt · p: pausa' : 'clic: jugar'
+  const hint = hasKeyboard(s) ? 'Esc: prompt · p: pausa' : 'clic: jugar'
   const styled = (run: Run, key: string) => (
     <Text
       key={key}

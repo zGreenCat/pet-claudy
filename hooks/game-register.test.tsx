@@ -2,7 +2,9 @@ import { test, expect } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On, PaneOpenArgs } from 'claude-code'
 
-import { STEP_MS } from './game-client'
+import { IDLE_PAUSE_TICKS, STEP_MS, advance } from './game-client'
+import type { Local } from './game-client'
+import { newGame } from './game'
 
 const pane = (isFocused: boolean) => ({
   component: 'Pane' as const,
@@ -92,30 +94,45 @@ test('without the keyboard the pane plays a demo on its own', async ($, on) => {
   await ui.unmount()
 })
 
-test('losing the keyboard pauses the game and clicking back resumes only on a key', async ($, on) => {
+test('a click on the game hands it the keys, though the pane is not focused', async ($, on) => {
   engine(on)
-  const ui = await mount($, true)
-  await ui.key({ key: 'right', in: 'game' })
-  await ui.advance(STEP_MS * 5)
-  expect(await shown(ui)).not.toMatch(/Pausa/)
+  const ui = await mount($, false)
+  expect(await shown(ui)).toMatch(/DEMO/)
 
-  await ui.redraw(pane(false).props)
-  expect(await shown(ui)).toMatch(/Pausa/)
-  const away = await shown(ui)
-  await ui.advance(STEP_MS * 30)
-  expect(await shown(ui)).toBe(away)
-
-  await ui.redraw(pane(true).props)
-  expect(await shown(ui)).toMatch(/Enter: seguir/)
-  const back = await shown(ui)
-  await ui.advance(STEP_MS * 30)
-  expect(await shown(ui)).toBe(back)
-
+  await ui.pointer({ type: 'down', x: 5, y: 5, button: 'left', in: 'game' })
+  expect(await shown(ui)).toMatch(/Enter: jugar/)
   await ui.key({ key: 'return', in: 'game' })
-  await ui.advance(STEP_MS * 30)
-  expect(await shown(ui)).not.toMatch(/Pausa/)
-  expect(await shown(ui)).not.toBe(back)
+  const started = await shown(ui)
+  await ui.advance(STEP_MS * 20)
+  expect(await shown(ui)).not.toMatch(/Pausa|DEMO/)
+  expect(await shown(ui)).not.toBe(started)
   await ui.unmount()
+})
+
+test('a key reaching the game is the keyboard too, with no click or pane focus', async ($, on) => {
+  engine(on)
+  const ui = await mount($, false)
+  await ui.key({ key: 'return', in: 'game' })
+  await ui.key({ key: 'return', in: 'game' })
+  await ui.advance(STEP_MS * 10)
+  expect(await shown(ui)).not.toMatch(/Pausa|DEMO/)
+  await ui.unmount()
+})
+
+test('a game that hears no key for a while pauses until a key', () => {
+  const s: Local = {
+    props: { isFocused: false, claude: 'idle' },
+    play: newGame(30, 14, 1),
+    demoOverFor: 0,
+    isPaused: false,
+    size: { w: 30, h: 14 },
+    hasKeys: true,
+    idleTicks: 0,
+  }
+  for (let i = 0; i < IDLE_PAUSE_TICKS - 1; i++) advance(s)
+  expect([s.hasKeys, s.isPaused]).toEqual([true, false])
+  advance(s)
+  expect([s.hasKeys, s.isPaused]).toEqual([false, true])
 })
 
 test('a resize pauses the game until a key', async ($, on) => {

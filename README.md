@@ -17,7 +17,7 @@ transcript in fullscreen from 110 columns, inline above the prompt otherwise)
 where Clawd flies a ship against waves of bugs. The ship fires on its own; you only steer.
 
 - `←` `→` or `a` `d`: move. `Enter` or `Space`: start or resume. `p`: pause. `r` or `Enter` after game over: restart.
-- The pane opens without the keyboard and plays a demo on autopilot. Click it to give it the keyboard and play; `Esc` hands it back to the prompt. Losing the keyboard, or a resize, pauses your game until you press a key.
+- The pane opens without the keyboard and plays a demo on autopilot. Click it to give it the keyboard and play; `Esc` hands it back to the prompt. The engine tells the game nothing when a click's keyboard goes back, so twelve seconds without a key, or a resize, pause your game until you click and press a key.
 - The board stays at most 44×20 cells, centered in a bigger pane; it needs at least 26 columns and 16 rows.
 - Three lives, a short invulnerability after a hit, harder waves. The status line shows whether Claude is working or done.
 - Closing the pane ends the game. The engine decides the pane width and side; the game asks for about a third.
