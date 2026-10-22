@@ -42,7 +42,7 @@ export const ENEMY_H = 2
 const PITCH_X = ENEMY_W + 2
 const PITCH_Y = ENEMY_H + 1
 const MAX_COLS = 6
-const MAX_ROWS = 3
+const MAX_ROWS = 6
 export const MIN_W = 24
 export const MIN_H = 12
 export const LIVES = 3
@@ -50,17 +50,23 @@ export const INVULN_TICKS = 14
 export const CELEBRATE_TICKS = 12
 const SPARK_TICKS = 3
 const FIRE_EVERY = 5
-const BOMB_FALL_EVERY = 2
 const KILL_SCORE = 10
 const WAVE_SCORE = 50
-// Rows above the ship the autopilot watches for bombs
-const DODGE_ROWS = 5
+// Ticks of warning the autopilot wants before a bomb reaches the ship
+const DODGE_TICKS = 10
+// Board rows per extra row a bumping wave descends, so a tall board keeps
+// the pace of a short one
+const ROWS_PER_DROP = 24
 
 // Ticks between enemy steps, and between bombs: harder each wave, to a floor
 export const enemyEvery = (wave: number) => Math.max(2, 7 - wave)
 export const bombEvery = (wave: number) => Math.max(8, 24 - 2 * wave)
 
 export const fits = (w: number, h: number) => w >= MIN_W && h >= MIN_H
+
+// On a tall board bombs fall a row a tick, on a short one every other tick
+export const bombFallEvery = (h: number) => (h >= 30 ? 1 : 2)
+export const dropRows = (h: number) => 1 + Math.floor(h / ROWS_PER_DROP)
 
 // The ship's top row, and the last row an enemy may reach before it invades
 const shipTop = (h: number) => h - SHIP_H
@@ -76,9 +82,13 @@ function roll(seed: number): [number, number] {
 }
 
 const formationCols = (w: number) => Math.min(MAX_COLS, Math.floor((w + 2) / PITCH_X))
-// Two rows of board in three go to bugs at most, so a wave has room to descend
-const formationRows = (h: number, wave: number) =>
-  Math.min(MAX_ROWS, 1 + Math.ceil(wave / 2), Math.floor((h - 6) / PITCH_Y))
+// The rows of bugs a board holds: about its upper third, never so many that a
+// wave has no room to descend
+const maxRows = (h: number) =>
+  Math.min(MAX_ROWS, Math.floor((h - 6) / PITCH_Y), Math.max(2, Math.floor((h / 3 + 1) / PITCH_Y)))
+// Two rows short of the board's fill on the first wave, one more every other
+export const formationRows = (h: number, wave: number) =>
+  Math.min(maxRows(h), Math.max(2, maxRows(h) - 2 + Math.ceil(wave / 2)))
 
 function formation(w: number, h: number, wave: number): Enemy[] {
   const cols = formationCols(w)
@@ -156,7 +166,8 @@ export function move(g: Game, dx: number): Game {
 // otherwise toward the nearest bug, to fire under it
 export function autopilot(g: Game): -1 | 0 | 1 {
   const center = g.ship + Math.floor(SHIP_W / 2)
-  const near = g.bombs.filter(b => b.y >= shipTop(g.h) - DODGE_ROWS && b.x >= g.ship - 1 && b.x <= g.ship + SHIP_W)
+  const watch = Math.ceil(DODGE_TICKS / bombFallEvery(g.h))
+  const near = g.bombs.filter(b => b.y >= shipTop(g.h) - watch && b.x >= g.ship - 1 && b.x <= g.ship + SHIP_W)
   if (near.length > 0) {
     const away = near[0]!.x >= center ? -1 : 1
     const blocked = (away === -1 && g.ship === 0) || (away === 1 && g.ship === g.w - SHIP_W)
@@ -199,7 +210,8 @@ function marchEnemies(g: Game): Game {
   const left = Math.min(...g.enemies.map(e => e.x))
   const right = Math.max(...g.enemies.map(e => e.x + ENEMY_W - 1))
   const bumps = (g.dir === 1 && right + 1 > g.w - 1) || (g.dir === -1 && left - 1 < 0)
-  const enemies = g.enemies.map(e => (bumps ? { ...e, y: e.y + 1 } : { ...e, x: e.x + g.dir }))
+  const drop = dropRows(g.h)
+  const enemies = g.enemies.map(e => (bumps ? { ...e, y: e.y + drop } : { ...e, x: e.x + g.dir }))
   const dir = bumps ? (-g.dir as 1 | -1) : g.dir
   return { ...g, enemies, dir }
 }
@@ -222,7 +234,7 @@ function dropBomb(g: Game): Game {
 // invulnerable for a while, so one impact costs one life
 function fall(g: Game): Game {
   const top = shipTop(g.h)
-  const falling = g.t % BOMB_FALL_EVERY === 0
+  const falling = g.t % bombFallEvery(g.h) === 0
   let lives = g.lives
   let invuln = g.invuln
   const sparks = [...g.sparks]

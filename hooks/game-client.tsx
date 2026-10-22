@@ -22,10 +22,9 @@ export const STEP_MS = 90
 const KEY_STEP = 2
 // Rows the HUD, the board's two borders and the status line take
 const FRAME_ROWS = 4
-// The board stays this small at most, centered in a bigger pane, so the
-// sprites keep their proportions
+// The board takes the pane's whole height, the room a shooter wants, but
+// stays this narrow at most, centered in a wider pane
 const MAX_W = 44
-const MAX_H = 20
 // Ticks the demo shows its lost game before it plays another
 const DEMO_RESTART_TICKS = 20
 // Ticks of play without a key before the game takes the keyboard for gone
@@ -125,7 +124,7 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
 
   // Not w and h: the JSX factory is h
   const width = Math.min(MAX_W, surface.columns - 2)
-  const height = Math.min(MAX_H, surface.rows - FRAME_ROWS)
+  const height = surface.rows - FRAME_ROWS
   if (width > 0 && height > 0 && (width !== s.size.w || height !== s.size.h)) {
     s.size = { w: width, h: height }
     if (fits(width, height)) {
@@ -204,7 +203,6 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
   const board = frame(lines.length > 0 ? overlay(paint(g), lines) : paint(g)).map(runs)
 
   const margin = ' '.repeat(Math.max(0, Math.floor((surface.columns - (s.size.w + 2)) / 2)))
-  const above = Math.max(0, Math.floor((surface.rows - (s.size.h + FRAME_ROWS)) / 2))
   const hint = hasKeyboard(s) ? 'Esc: prompt · p: pausa' : 'clic: jugar'
   const styled = (run: Run, key: string) => (
     <Text
@@ -219,9 +217,6 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
 
   return (
     <Box flexDirection="column">
-      {Array.from({ length: above }, (_, i) => (
-        <Text key={`a${i}`}> </Text>
-      ))}
       {demo ? (
         <Text wrap="truncate">
           {margin}

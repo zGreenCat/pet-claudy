@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { ENEMY_H, ENEMY_W, INVULN_TICKS, LIVES, MIN_H, MIN_W, SHIP_H, SHIP_W, autopilot, move, newGame, resize, step } from './game'
+import { ENEMY_H, ENEMY_W, INVULN_TICKS, LIVES, MIN_H, MIN_W, SHIP_H, SHIP_W, autopilot, bombFallEvery, dropRows, formationRows, move, newGame, resize, step } from './game'
 import type { Game } from './game'
 
 const play = (g: Game, ticks: number) => {
@@ -187,5 +187,28 @@ test('a demo on autopilot clears a wave and keeps everything on the board', () =
     expect(g.ship).toBeGreaterThanOrEqual(0)
     expect(g.ship).toBeLessThanOrEqual(g.w - SHIP_W)
   }
+  expect(g.wave).toBe(2)
+})
+
+test('a tall board holds more rows of bugs, in its upper third', () => {
+  const short = newGame(30, 16, 1)
+  const tall = newGame(30, 48, 1)
+  expect(tall.rows).toBeGreaterThan(short.rows)
+  expect(formationRows(48, 5)).toBeGreaterThan(tall.rows)
+  for (const e of tall.enemies) expect(e.y + ENEMY_H - 1).toBeLessThan(48 / 3 + 1)
+})
+
+test('on a tall board bombs fall faster and a bumping wave drops further', () => {
+  expect(bombFallEvery(48)).toBeLessThan(bombFallEvery(16))
+  expect(dropRows(48)).toBeGreaterThan(dropRows(16))
+  const g0 = newGame(30, 48, 1)
+  let g: Game = { ...g0, enemies: [{ x: 26, y: 1, row: 0 }], dir: 1, t: 0, wave: 6, cooldown: 99 }
+  g = play(g, 3)
+  expect(g.enemies[0]!.y).toBe(1 + dropRows(48))
+})
+
+test('a demo on a tall board clears a wave too', () => {
+  let g = newGame(40, 48, 5)
+  for (let i = 0; i < 4000 && g.status === 'playing' && g.wave === 1; i++) g = step(move(g, autopilot(g)))
   expect(g.wave).toBe(2)
 })
