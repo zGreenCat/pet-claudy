@@ -64,6 +64,11 @@ Los cambios solo de documentación no requieren ejecutar las pruebas del plugin.
   en imperativo. Ejemplo: `fix: let Clawd share the prompt band with other plugins`.
 - Cuando haga falta cuerpo, escribir un párrafo breve en inglés que explique
   el comportamiento final y su motivo, siguiendo el tono de los commits existentes.
+- Todo commit que cambie código del plugin sube `version` en
+  `.claude-plugin/plugin.json` dentro del mismo commit: `feat:` sube el minor
+  (0.11.1 → 0.12.0) y `fix:` el patch (0.11.1 → 0.11.2). `docs:` y los cambios
+  solo de tests no la suben. `/plugin` compara esa versión para actualizar; si
+  no cambia, la instalación se queda en el commit anterior aunque haya push.
 - No añadir `Co-Authored-By`, `Authored-By`, firmas de asistentes ni atribuciones
   automáticas al mensaje del commit.
 - Antes de crear un commit, comprobar autor y committer efectivos. En este
