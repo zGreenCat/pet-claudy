@@ -79,7 +79,8 @@ Los cambios solo de documentación no requieren ejecutar las pruebas del plugin.
 - No incluir cambios ajenos. Crear commits y hacer push cuando el usuario lo
   solicite; no reescribir commits publicados sin autorización explícita.
 
-## Plan del minijuego
+## Planes de trabajo
 
-Consultar `PLAN_GAME.md` antes de implementar Clawd Invaders. Es un plan de
-trabajo, no una declaración de funcionalidades ya disponibles.
+Consultar `PLAN_GAME.md` antes de implementar Clawd Invaders, y `PLAN_MOODS.md`
+antes de cambiar cómo Clawd elige sus moods o de agregar uno nuevo. Son planes
+de trabajo, no una declaración de funcionalidades ya disponibles.
