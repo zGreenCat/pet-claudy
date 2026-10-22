@@ -17,6 +17,8 @@ export type Game = {
   score: number
   wave: number
   enemies: Enemy[]
+  // Rows the wave started with: a bug's worth comes from its row in them
+  rows: number
   dir: 1 | -1
   shots: Vec[]
   bombs: Vec[]
@@ -62,9 +64,11 @@ function roll(seed: number): [number, number] {
   return [((r ^ (r >>> 14)) >>> 0) / 4294967296, s]
 }
 
+const formationRows = (h: number, wave: number) => Math.min(MAX_ROWS, 2 + Math.ceil(wave / 2), h - 7)
+
 function formation(w: number, h: number, wave: number): Enemy[] {
   const cols = Math.min(MAX_COLS, Math.floor((w - 1) / PITCH))
-  const rows = Math.min(MAX_ROWS, 2 + Math.ceil(wave / 2), h - 7)
+  const rows = formationRows(h, wave)
   const x0 = Math.floor((w - (cols * PITCH - 1)) / 2)
   const enemies: Enemy[] = []
   for (let row = 0; row < rows; row++) {
@@ -83,6 +87,7 @@ export function newGame(w: number, h: number, seed: number): Game {
     score: 0,
     wave: 1,
     enemies: formation(w, h, 1),
+    rows: formationRows(h, 1),
     dir: 1,
     shots: [],
     bombs: [],
@@ -96,7 +101,20 @@ export function newGame(w: number, h: number, seed: number): Game {
   }
 }
 
-// The same game on a new board: score, lives and wave kept; what flew is gone
+// The living bugs moved as one block just enough to fit the board and stay
+// above the defense line. A full formation fits any board from the minimum up,
+// so the block always does.
+function refit(enemies: Enemy[], w: number, h: number): Enemy[] {
+  if (enemies.length === 0) return enemies
+  const right = Math.max(...enemies.map(e => e.x + ENEMY_W - 1))
+  const bottom = Math.max(...enemies.map(e => e.y))
+  const dx = Math.min(0, w - 1 - right)
+  const dy = Math.min(0, h - 3 - bottom)
+  return enemies.map(e => ({ ...e, x: e.x + dx, y: e.y + dy }))
+}
+
+// The same game on a new board: score, lives, wave and the living bugs kept;
+// what flew is gone
 export function resize(g: Game, w: number, h: number): Game {
   if (!fits(w, h)) throw new Error(`board ${w}x${h} is under the minimum ${MIN_W}x${MIN_H}`)
   return {
@@ -104,8 +122,7 @@ export function resize(g: Game, w: number, h: number): Game {
     w,
     h,
     ship: Math.min(g.ship, w - SHIP_W),
-    enemies: g.celebrate > 0 ? [] : formation(w, h, g.wave),
-    dir: 1,
+    enemies: refit(g.enemies, w, h),
     shots: [],
     bombs: [],
     sparks: [],
@@ -126,7 +143,6 @@ function collide(g: Game): Game {
   let score = g.score
   const shots: Vec[] = []
   const sparks = [...g.sparks]
-  const top = Math.max(...g.enemies.map(e => e.row))
   for (const s of g.shots) {
     const hit = enemies.find(e => covers(e, s))
     if (!hit) {
@@ -134,7 +150,7 @@ function collide(g: Game): Game {
       continue
     }
     enemies = enemies.filter(e => e !== hit)
-    score += KILL_SCORE * (1 + top - hit.row)
+    score += KILL_SCORE * Math.max(1, g.rows - hit.row)
     sparks.push({ x: hit.x, y: hit.y, life: SPARK_TICKS })
   }
   return { ...g, enemies, shots, sparks, score }
@@ -212,7 +228,8 @@ export function step(g: Game): Game {
 
   if (n.celebrate > 0) {
     const celebrate = n.celebrate - 1
-    return celebrate > 0 ? { ...n, celebrate } : { ...n, celebrate, enemies: formation(n.w, n.h, n.wave), dir: 1 }
+    if (celebrate > 0) return { ...n, celebrate }
+    return { ...n, celebrate, enemies: formation(n.w, n.h, n.wave), rows: formationRows(n.h, n.wave), dir: 1 }
   }
 
   if (n.cooldown === 0) n = { ...n, cooldown: FIRE_EVERY, shots: [...n.shots, { x: n.ship + 1, y: n.h - 2 }] }

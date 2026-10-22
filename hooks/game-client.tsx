@@ -5,7 +5,7 @@
 import type { ClientSurface } from 'claude-code'
 
 import type { ClaudeState } from '../types'
-import { fits, move, newGame, resize, step } from './game'
+import { LIVES, fits, move, newGame, resize, step } from './game'
 import type { Game } from './game'
 import { overlay, paint, runs } from './game-sprites'
 
@@ -23,6 +23,7 @@ type Local = {
   isPaused: boolean
   // The size the game was last laid out for
   size: { w: number; h: number }
+  stopClock?: () => void
 }
 
 const CLAUDE_LINE: Record<ClaudeState, string> = {
@@ -58,11 +59,20 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
     surface.setState(s)
     const redraw = () => surface.setState(s)
 
-    surface.every(STEP_MS, () => {
-      if (!isPlaying(s) || !s.game) return
+    // The clock runs only while the game plays: it stops itself on the first
+    // tick that finds it paused, over or out of room, and a key starts it again
+    const tick = () => {
+      if (!isPlaying(s) || !s.game) {
+        s.stopClock?.()
+        s.stopClock = undefined
+        return
+      }
       s.game = step(s.game)
       redraw()
-    })
+    }
+    const startClock = () => {
+      if (s.stopClock === undefined && isPlaying(s)) s.stopClock = surface.every(STEP_MS, tick)
+    }
 
     surface.onKey(({ key, ctrl, meta }) => {
       if (ctrl || meta || !s.game || !fits(s.size.w, s.size.h)) return
@@ -84,6 +94,7 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
       } else {
         return
       }
+      startClock()
       redraw()
     })
   }
@@ -113,7 +124,7 @@ export default function GameClient(props: Props, surface: ClientSurface<Local>) 
   else if (s.isPaused) lines = ['Pausa', 'Enter: seguir · ←/→ o a/d: mover']
 
   const rows = (lines.length > 0 ? overlay(paint(g), lines) : paint(g)).map(runs)
-  const hearts = '♥'.repeat(g.lives) + '♡'.repeat(Math.max(0, 3 - g.lives))
+  const hearts = '♥'.repeat(g.lives) + '♡'.repeat(Math.max(0, LIVES - g.lives))
 
   return (
     <Box flexDirection="column">

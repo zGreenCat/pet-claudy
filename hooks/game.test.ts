@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { INVULN_TICKS, LIVES, MIN_H, MIN_W, SHIP_W, move, newGame, resize, step } from './game'
+import { ENEMY_W, INVULN_TICKS, LIVES, MIN_H, MIN_W, SHIP_W, move, newGame, resize, step } from './game'
 import type { Game } from './game'
 
 const play = (g: Game, ticks: number) => {
@@ -103,6 +103,41 @@ test('resizing keeps score and lives and clears what flew', () => {
   expect(g.bombs).toHaveLength(0)
   expect(g.ship).toBeLessThanOrEqual(40 - SHIP_W)
   expect(() => resize(g, 5, 5)).toThrow()
+})
+
+test('resizing keeps the living bugs, in their places and rows', () => {
+  const g0 = newGame(30, 14, 1)
+  const alive = [g0.enemies[0]!, g0.enemies[4]!, g0.enemies[9]!]
+  const g = resize({ ...g0, enemies: alive }, 40, 16)
+  expect(g.enemies).toEqual(alive)
+  expect(g.rows).toBe(g0.rows)
+})
+
+test('a smaller board moves the bugs inside it and above the defense line', () => {
+  const g0 = newGame(40, 18, 1)
+  const low = g0.enemies.map(e => ({ ...e, x: e.x + 15, y: e.y + 10 }))
+  const g = resize({ ...g0, enemies: low }, MIN_W, MIN_H)
+  expect(g.enemies).toHaveLength(low.length)
+  for (const e of g.enemies) {
+    expect(e.x).toBeGreaterThanOrEqual(0)
+    expect(e.x + ENEMY_W).toBeLessThanOrEqual(g.w)
+    expect(e.y).toBeGreaterThanOrEqual(1)
+    expect(e.y).toBeLessThan(g.h - 2)
+  }
+  const [a, b] = [low[0]!, low[1]!]
+  const [ra, rb] = [g.enemies[0]!, g.enemies[1]!]
+  expect([rb.x - ra.x, rb.y - ra.y]).toEqual([b.x - a.x, b.y - a.y])
+  expect(step({ ...g, cooldown: 99 }).status).toBe('playing')
+})
+
+test('a bug is worth its row in the wave, however many rows are left', () => {
+  const g0 = newGame(30, 14, 1)
+  const top = g0.enemies.find(e => e.row === 0)!
+  const bottom = g0.enemies.find(e => e.row === g0.rows - 1)!
+  const shoot = (e: typeof top) =>
+    step({ ...g0, enemies: [e, { ...e, x: 26, y: 1 }], shots: [{ x: e.x, y: e.y + 1 }], cooldown: 99, ship: 0 }).score
+  expect(shoot(top)).toBe(10 * g0.rows)
+  expect(shoot(bottom)).toBe(10)
 })
 
 test('entities never leave the board over a long game', () => {

@@ -23,13 +23,18 @@ export async function registerGameCommand($: EngineInterface) {
   })
 }
 
-// A slash command is no turn for Claude: only a prompt starts the work
+// A slash command is no turn for Claude: only a prompt starts the work. A
+// prompt that opens with a path, like /home/x/foo.ts, is still a prompt.
+const isSlashCommand = (text: string) => /^\/[\w:-]+(\s|$)/.test(text)
+
 export async function trackPrompt($: EngineInterface, e: PromptSubmitInput) {
-  if (!e.text.startsWith('/')) await update($, claude, () => 'working')
+  if (!isSlashCommand(e.text)) await update($, claude, () => 'working')
 }
 
+// Only a turn that answered ends the work, as for the mascot: other turns of
+// the main loop leave the state as it was
 export async function trackTurn($: EngineInterface, e: TurnCompleteInput) {
-  if (e.agentId === undefined) await update($, claude, () => (e.reason === 'answer' ? 'done' : 'idle'))
+  if (e.agentId === undefined && e.reason === 'answer') await update($, claude, () => 'done')
 }
 
 export const registerGame: Register = on => {
@@ -37,7 +42,12 @@ export const registerGame: Register = on => {
     const columns = Math.max(MIN_W + 2, Math.round(e.presentation.columns / 3))
     const opened = await $.ui.open({ id: PANE, title: 'Clawd Invaders', focus: true, rows: INLINE_ROWS, columns })
     return opened.isPlaced ? {} : { text: `Clawd Invaders no cabe aquí: ${opened.reason}` }
-  }).catch(($, e, next) => next(e))
+  }).catch(($, e, next) => {
+    // The error crosses from the engine as a plain object, not an Error
+    const err: unknown = next.error
+    const reason = typeof err === 'object' && err !== null && 'message' in err ? String(err.message) : String(err)
+    return { text: `Clawd Invaders no pudo abrirse: ${reason}` }
+  })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Client } = $.ui.resolve(e)

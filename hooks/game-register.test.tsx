@@ -57,6 +57,12 @@ test('a pane that cannot be placed says why', async ($, on) => {
   expect(result.text).toMatch(/terminal too narrow/)
 })
 
+test('a pane that fails to open says so', async ($, on) => {
+  on('ui.open', () => ({ deny: 'no pane today' }))
+  const result = await $.command.run(run)
+  expect(result.text).toMatch(/no pudo abrirse: .*no pane today/)
+})
+
 test('the game waits for a key, then plays', async ($, on) => {
   engine(on)
   const ui = await mount($, true)
@@ -78,14 +84,60 @@ test('losing the keyboard pauses the game and clicking back resumes only on a ke
   await ui.key({ key: 'right', in: 'game' })
   await ui.advance(STEP_MS * 5)
   expect(await shown(ui)).not.toMatch(/Pausa/)
-  await ui.unmount()
 
-  const away = await mount($, false)
-  expect(await shown(away)).toMatch(/Pausa/)
-  const frozen = await shown(away)
-  await away.advance(STEP_MS * 30)
-  expect(await shown(away)).toBe(frozen)
-  await away.unmount()
+  await ui.redraw(pane(false).props)
+  expect(await shown(ui)).toMatch(/Pausa/)
+  const away = await shown(ui)
+  await ui.advance(STEP_MS * 30)
+  expect(await shown(ui)).toBe(away)
+
+  await ui.redraw(pane(true).props)
+  expect(await shown(ui)).toMatch(/Enter: seguir/)
+  const back = await shown(ui)
+  await ui.advance(STEP_MS * 30)
+  expect(await shown(ui)).toBe(back)
+
+  await ui.key({ key: 'return', in: 'game' })
+  await ui.advance(STEP_MS * 30)
+  expect(await shown(ui)).not.toMatch(/Pausa/)
+  expect(await shown(ui)).not.toBe(back)
+  await ui.unmount()
+})
+
+test('a resize pauses the game until a key', async ($, on) => {
+  engine(on)
+  const ui = await mount($, true)
+  await ui.key({ key: 'return', in: 'game' })
+  await ui.advance(STEP_MS * 5)
+
+  await ui.resize({ columns: 34, rows: 18, in: 'game' })
+  expect(await shown(ui)).toMatch(/Pausa/)
+  const frozen = await shown(ui)
+  await ui.advance(STEP_MS * 30)
+  expect(await shown(ui)).toBe(frozen)
+
+  await ui.key({ key: 'return', in: 'game' })
+  await ui.advance(STEP_MS * 30)
+  expect(await shown(ui)).not.toMatch(/Pausa/)
+  await ui.unmount()
+})
+
+test('p pauses the game and p again resumes it', async ($, on) => {
+  engine(on)
+  const ui = await mount($, true)
+  await ui.key({ key: 'return', in: 'game' })
+  await ui.advance(STEP_MS * 5)
+
+  await ui.key({ key: 'p', in: 'game' })
+  expect(await shown(ui)).toMatch(/Pausa/)
+  const frozen = await shown(ui)
+  await ui.advance(STEP_MS * 30)
+  expect(await shown(ui)).toBe(frozen)
+
+  await ui.key({ key: 'p', in: 'game' })
+  await ui.advance(STEP_MS * 30)
+  expect(await shown(ui)).not.toMatch(/Pausa/)
+  await ui.unmount()
 })
 
 test('a panel under the minimum shows a short message and plays nothing', async ($, on) => {
@@ -108,7 +160,7 @@ test('the status line follows Claude, and a slash command does not start it', as
   await ui.advance(STEP_MS)
   expect(await shown(ui)).toMatch(/en espera/)
 
-  await $.prompt.submit({ text: 'haz algo' })
+  await $.prompt.submit({ text: '/home/x/foo.ts revisa esto' })
   await ui.advance(STEP_MS)
   expect(await shown(ui)).toMatch(/trabajando/)
   await ui.unmount()
