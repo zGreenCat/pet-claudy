@@ -1,7 +1,23 @@
 {
   "name": "clawd-buddy",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Clawd, the Claude Code mascot, dancing above the prompt, with a small buddy at a laptop for each subagent, saying what it is doing",
-  "author": { "name": "varay" },
-  "types": "./types/index.d.ts"
+  "author": {
+    "name": "varay"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "breakMood": {
+      "type": "string",
+      "title": "Break de Clawd",
+      "description": "Qué hace Clawd en sus breaks cuando no lo usas: rotar entre cigarro y café, uno al azar, o siempre el mismo.",
+      "default": "rotar",
+      "options": [
+        "rotar",
+        "azar",
+        "cigarro",
+        "cafe"
+      ]
+    }
+  }
 }

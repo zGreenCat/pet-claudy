@@ -21,6 +21,7 @@ import type { Frame, Moment, Mood } from './clawd'
 import { START_X, describe, oneLine, scene, solo, summary, walk } from './desks'
 import type { Agent, Segment } from './desks'
 import { registerGame, registerGameCommand, trackPrompt, trackTurn } from './game-register'
+import { registerMoodCommand, registerMoods } from './mood-register'
 
 // The view key last drawn. The timer only writes it when what Clawd shows
 // changes, so a still Clawd costs no redraws.
@@ -35,6 +36,7 @@ const FAILURES_TO_REPORT = 5
 
 export const register: Register = (on, options) => {
   registerGame(on, options)
+  registerMoods(on, options)
 
   // Module state: the clock, and what the last draw saw of the band
   let t = 0
@@ -139,6 +141,12 @@ export const register: Register = (on, options) => {
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
       $.ui.toast(`clawd-buddy: /clawd-play no está disponible (${reason})`)
+    }
+    try {
+      await registerMoodCommand($)
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
+      $.ui.toast(`clawd-buddy: /clawd-mood no está disponible (${reason})`)
     }
 
     return next(e)

@@ -106,6 +106,31 @@ Sin verificar en la versión instalada, y por eso es la etapa 1:
 Si la escritura desde el plugin no funciona, la alternativa es elegir solo
 desde `/config` y que `/clawd-mood` muestre el estado y cómo cambiarlo.
 
+### Resultados de la etapa 1
+
+Confirmado en la declaración de la API (`Register`): las opciones quedan fijas
+durante una activación, y cambiar una **recarga el plugin**: `register` corre
+otra vez con las nuevas. Elegir una variante reinicia el estado del módulo
+(el reloj de Clawd, los agentes vistos) y probablemente el juego abierto, cuyo
+estado vive en su `Client`.
+
+Prototipo (v0.14.0): campo `userConfig.breakMood` (`rotar`, `azar`, `cigarro`,
+`cafe`; por defecto `rotar`), aún sin efecto en lo que dibuja Clawd, y
+`/clawd-mood` en `hooks/mood-register.tsx`, con `immediate`. Probado en el
+motor con un `config.set` simulado: escribe `clawd-buddy.breakMood`, muestra
+un `deny` y rechaza espacios y variantes inválidos sin escribir.
+
+Pendiente de comprobar a mano en una sesión real:
+
+| Pregunta | Resultado |
+| --- | --- |
+| `$.config.set` del plugin sobre su propio campo escribe, o responde `deny` | pendiente |
+| Tras escribir, el plugin se recarga y `/clawd-mood` muestra el valor nuevo | pendiente |
+| El valor sobrevive a cerrar y abrir la sesión | pendiente |
+| `/config` muestra el selector, con título y descripción en español | pendiente |
+| `/clawd-mood` corre durante un turno activo | pendiente |
+| Qué le pasa a una partida abierta de Clawd Invaders al recargar | pendiente |
+
 ## Arquitectura propuesta
 
 | Archivo | Responsabilidad |
