@@ -7,9 +7,9 @@ import { MIN_W } from './game'
 const PANE = 'clawd-play'
 const COMMAND = 'clawd-play'
 // Rows asked of the pane when it sits inline above the prompt
-const INLINE_ROWS = 16
+const INLINE_ROWS = 18
 // The cap on an inline board, whatever room the layout spares
-const MAX_INLINE_ROWS = 18
+const MAX_INLINE_ROWS = 20
 
 const claude = atom({ plugin: 'clawd-buddy', key: 'claude' } as const, 'idle' as ClaudeState)
 

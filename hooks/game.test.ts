@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { ENEMY_W, INVULN_TICKS, LIVES, MIN_H, MIN_W, SHIP_W, move, newGame, resize, step } from './game'
+import { ENEMY_H, ENEMY_W, INVULN_TICKS, LIVES, MIN_H, MIN_W, SHIP_H, SHIP_W, autopilot, move, newGame, resize, step } from './game'
 import type { Game } from './game'
 
 const play = (g: Game, ticks: number) => {
@@ -113,21 +113,33 @@ test('resizing keeps the living bugs, in their places and rows', () => {
   expect(g.rows).toBe(g0.rows)
 })
 
-test('a smaller board moves the bugs inside it and above the defense line', () => {
-  const g0 = newGame(40, 18, 1)
-  const low = g0.enemies.map(e => ({ ...e, x: e.x + 15, y: e.y + 10 }))
-  const g = resize({ ...g0, enemies: low }, MIN_W, MIN_H)
-  expect(g.enemies).toHaveLength(low.length)
+const inside = (g: Game) => {
   for (const e of g.enemies) {
     expect(e.x).toBeGreaterThanOrEqual(0)
     expect(e.x + ENEMY_W).toBeLessThanOrEqual(g.w)
     expect(e.y).toBeGreaterThanOrEqual(1)
-    expect(e.y).toBeLessThan(g.h - 2)
+    expect(e.y + ENEMY_H - 1).toBeLessThan(g.h - SHIP_H - 1)
   }
-  const [a, b] = [low[0]!, low[1]!]
-  const [ra, rb] = [g.enemies[0]!, g.enemies[1]!]
+}
+
+test('a shorter board moves the bugs up as one block, above the defense line', () => {
+  const g0 = newGame(30, 20, 1)
+  const low = g0.enemies.map(e => ({ ...e, y: e.y + 9 }))
+  const g = resize({ ...g0, enemies: low }, 30, MIN_H)
+  expect(g.enemies).toHaveLength(low.length)
+  inside(g)
+  const [a, b] = [low[0]!, low[low.length - 1]!]
+  const [ra, rb] = [g.enemies[0]!, g.enemies[g.enemies.length - 1]!]
   expect([rb.x - ra.x, rb.y - ra.y]).toEqual([b.x - a.x, b.y - a.y])
   expect(step({ ...g, cooldown: 99 }).status).toBe('playing')
+})
+
+test('a board too narrow for the block lays it out again, never with more bugs', () => {
+  const g0 = newGame(44, 20, 1)
+  const g = resize(g0, MIN_W, MIN_H)
+  expect(g.enemies.length).toBeGreaterThan(0)
+  expect(g.enemies.length).toBeLessThanOrEqual(g0.enemies.length)
+  inside(g)
 })
 
 test('a bug is worth its row in the wave, however many rows are left', () => {
@@ -151,4 +163,29 @@ test('entities never leave the board over a long game', () => {
       expect(v.y).toBeLessThan(g.h + 1)
     }
   }
+})
+
+test('the autopilot steps away from a bomb coming down on the ship', () => {
+  const g0 = newGame(30, 14, 1)
+  const center = g0.ship + 2
+  expect(autopilot({ ...g0, bombs: [{ x: center + 1, y: g0.h - 5 }] })).toBe(-1)
+  expect(autopilot({ ...g0, bombs: [{ x: center - 1, y: g0.h - 5 }] })).toBe(1)
+  expect(autopilot({ ...g0, ship: 0, bombs: [{ x: 3, y: g0.h - 5 }] })).toBe(1)
+})
+
+test('the autopilot heads for the nearest bug and holds under it', () => {
+  const g0 = newGame(30, 14, 1)
+  expect(autopilot({ ...g0, ship: 0, enemies: [{ x: 20, y: 1, row: 0 }] })).toBe(1)
+  expect(autopilot({ ...g0, ship: 25, enemies: [{ x: 2, y: 1, row: 0 }] })).toBe(-1)
+  expect(autopilot({ ...g0, ship: 19, enemies: [{ x: 20, y: 1, row: 0 }] })).toBe(0)
+})
+
+test('a demo on autopilot clears a wave and keeps everything on the board', () => {
+  let g = newGame(30, 16, 5)
+  for (let i = 0; i < 3000 && g.status === 'playing' && g.wave === 1; i++) {
+    g = step(move(g, autopilot(g)))
+    expect(g.ship).toBeGreaterThanOrEqual(0)
+    expect(g.ship).toBeLessThanOrEqual(g.w - SHIP_W)
+  }
+  expect(g.wave).toBe(2)
 })

@@ -66,7 +66,7 @@ test('a pane that fails to open says so', async ($, on) => {
 test('the game waits for a key, then plays', async ($, on) => {
   engine(on)
   const ui = await mount($, true)
-  expect(await shown(ui)).toMatch(/Enter: seguir/)
+  expect(await shown(ui)).toMatch(/Enter: jugar/)
   const before = await shown(ui)
   await ui.advance(STEP_MS * 20)
   expect(await shown(ui)).toBe(before)
@@ -75,6 +75,20 @@ test('the game waits for a key, then plays', async ($, on) => {
   expect(await shown(ui)).not.toMatch(/Pausa/)
   await ui.advance(STEP_MS * 40)
   expect(await shown(ui)).not.toBe(before)
+  await ui.unmount()
+})
+
+test('without the keyboard the pane plays a demo on its own', async ($, on) => {
+  engine(on)
+  const ui = await mount($, false)
+  expect(await shown(ui)).toMatch(/DEMO/)
+  const before = await shown(ui)
+  await ui.advance(STEP_MS * 20)
+  expect(await shown(ui)).not.toBe(before)
+
+  await ui.redraw(pane(true).props)
+  expect(await shown(ui)).toMatch(/Enter: jugar/)
+  expect(await shown(ui)).not.toMatch(/DEMO/)
   await ui.unmount()
 })
 
