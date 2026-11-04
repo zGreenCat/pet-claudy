@@ -152,10 +152,14 @@ function bounce(t: number, span: number): number {
   return p < span ? p : period - p
 }
 
-// Where a working Clawd `width` cells wide stands at tick `t`: one cell every
-// other tick, back and forth within the band
-function walked(t: number, width: number, bodyColumns: number): number {
-  return bounce(Math.floor(t / 2), Math.min(40, bodyColumns - width - 22))
+// The widest Clawd walks: with the pan out. Every pose walks the same span,
+// so it does not jump when the pan comes out or goes away
+const WALK_WIDTH = 14
+
+// Where a working Clawd stands at tick `t`: one cell every other tick, back
+// and forth within the band
+export function walked(t: number, bodyColumns: number): number {
+  return bounce(Math.floor(t / 2), Math.min(40, bodyColumns - WALK_WIDTH - 22))
 }
 
 export type View = { frame: Frame; marks: Mark[]; x: number; line: string; isWorking: boolean }
@@ -427,9 +431,36 @@ export function isSmoking(idleTicks: number): boolean {
   )
 }
 
+// Working, `s` ticks into it: dancing, the line changing every six seconds,
+// and one line in four cooking code in a pan. 24 ticks is three tosses and four
+// turns of the dance, so each line ends with the food in the pan or the feet
+// together
+function working(s: number): Pose {
+  const line = WORKING_LINES[Math.floor(s / 24) % WORKING_LINES.length]!
+  const pose = isCookingAt(s) ? cooking(s) : { frame: DANCE[s % DANCE.length]!, marks: [] }
+  const dots = '.'.repeat((Math.floor(s / 2) % 3) + 1)
+  return { ...pose, line: line + dots }
+}
+
+function isCookingAt(s: number): boolean {
+  return WORKING_LINES[Math.floor(s / 24) % WORKING_LINES.length]!.startsWith('cocinando')
+}
+
+// Waiting, `s` ticks into it: a blink once every ~4s, a sway every second
+function idling(s: number): Pose {
+  return {
+    frame: s % 16 === 15 ? BLINK : IDLE,
+    marks: [],
+    line: IDLE_LINES[Math.floor(s / 40) % IDLE_LINES.length]!,
+    dx: Math.floor(s / 4) % 2,
+  }
+}
+
 // What Clawd shows at tick `t`, given how long the session has been idle,
 // when a turn just ended how many ticks ago, the moment it is having, how
-// many ticks it has been reading, and how long a command has been running
+// many ticks it has been reading, and how long a command has been running.
+// It has no memory of what it showed before: the director (`director.ts`)
+// is what lets a scene end before the next one begins
 export function view(
   t: number,
   idleTicks: number,
@@ -445,24 +476,20 @@ export function view(
   }
   if (now && now.since >= 0 && now.since < MOMENT_TICKS[now.mood]) {
     // It stops where it stood when the moment began, and walks on from there
-    const x = isWorking ? walked(Math.max(0, t - now.since), WIDTH, bodyColumns) : 0
+    const x = isWorking ? walked(Math.max(0, t - now.since), bodyColumns) : 0
     const { dx = 0, ...scene } = moment(now)
     return { ...scene, x: x + dx, isWorking }
   }
   if (isWorking && readingFor !== undefined && readingFor >= 0) {
     // It stops where it stood to read, and walks on from there after
-    return { ...reading(readingFor), x: walked(Math.max(0, t - readingFor), WIDTH, bodyColumns), isWorking }
+    return { ...reading(readingFor), x: walked(Math.max(0, t - readingFor), bodyColumns), isWorking }
   }
   if (isWorking && runningFor !== undefined && runningFor >= MUSIC_AFTER_TICKS) {
     const listened = runningFor - MUSIC_AFTER_TICKS
-    return { ...listening(listened), x: walked(Math.max(0, t - listened), WIDTH, bodyColumns), isWorking }
+    return { ...listening(listened), x: walked(Math.max(0, t - listened), bodyColumns), isWorking }
   }
   if (isWorking) {
-    const line = WORKING_LINES[Math.floor(t / 24) % WORKING_LINES.length]!
-    const pose = line.startsWith('cocinando') ? cooking(t) : { frame: DANCE[t % DANCE.length]!, marks: [] }
-    const dots = '.'.repeat((Math.floor(t / 2) % 3) + 1)
-    const width = Math.max(...pose.frame.map(r => r.length))
-    return { ...pose, x: walked(t, width, bodyColumns), line: line + dots, isWorking }
+    return { ...working(t), x: walked(t, bodyColumns), isWorking }
   }
   if (idleTicks >= SLEEP_AFTER_TICKS) {
     return { frame: BLINK, marks: [], x: 0, line: 'zzz', isWorking }
@@ -471,14 +498,92 @@ export function view(
     if (isCoffeeBreak(idleTicks)) return { ...coffee(t), x: 0, line: 'un cafecito', isWorking }
     return { ...smoking(t), x: 0, line: 'en mi break', isWorking }
   }
-  // Blink once every ~4s, sway every second
-  return {
-    frame: t % 16 === 15 ? BLINK : IDLE,
-    marks: [],
-    x: Math.floor(t / 4) % 2,
-    line: IDLE_LINES[Math.floor(t / 40) % IDLE_LINES.length]!,
-    isWorking,
-  }
+  const { dx = 0, ...pose } = idling(t)
+  return { ...pose, x: dx, isWorking }
+}
+
+// The scenes Clawd plays, each from its own first frame. A loop (working,
+// reading, a break) runs while it is wanted and gives way only where it can
+// stop cleanly; a scene with a length (a moment, the cheer) plays to its end
+export type SceneId = 'celebrate' | Mood | 'read' | 'music' | 'work' | 'sleep' | 'smoke' | 'coffee' | 'idle'
+export type Pose = { frame: Frame; marks: Mark[]; line: string; dx?: number }
+// Where it stands: walking about the band, still where it stood, or at its
+// spot at the left
+export type Place = 'walk' | 'stand' | 'home'
+export type Scene = {
+  place: Place
+  // Ticks a scene with an end lasts
+  length?: number
+  // Ticks a loop holds at least once it begins, so it does not flicker
+  minTicks?: number
+  // Whether a loop `s` ticks in may give way: not mid-toss nor mid-sip
+  canLeave?: (s: number) => boolean
+  play: (s: number) => Pose
+  // A short way out before the next scene: the book closes, the headphones
+  // come off. Clawd stands where it stood meanwhile
+  exit?: { ticks: number; play: (s: number) => Pose }
+}
+
+function momentScene(mood: Mood): Scene {
+  return { place: 'stand', length: MOMENT_TICKS[mood], play: s => moment({ mood, since: s }) }
+}
+
+export const SCENES: Record<SceneId, Scene> = {
+  celebrate: { place: 'home', length: CELEBRATE_TICKS, play: celebrating },
+  cool: momentScene('cool'),
+  love: momentScene('love'),
+  idea: momentScene('idea'),
+  magic: momentScene('magic'),
+  super: momentScene('super'),
+  dizzy: momentScene('dizzy'),
+  read: {
+    place: 'stand',
+    minTicks: 4,
+    play: reading,
+    // A last page turned, then the book is put away
+    exit: {
+      ticks: 2,
+      play: s => ({ frame: s === 0 ? [HEAD, BODY_BOOK_TURN, LEGS_BOOK] : IDLE, marks: [], line: 'leyendo…' }),
+    },
+  },
+  music: {
+    place: 'stand',
+    minTicks: 4,
+    canLeave: s => s % 4 === 0,
+    play: listening,
+    // Both arms up to lift the headphones off its head
+    exit: {
+      ticks: 2,
+      play: s =>
+        s === 0
+          ? { frame: [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS], marks: [{ row: 0, x: 0, text: '╭──────╮', fg: PHONES }], line: 'musiquita…' }
+          : { frame: IDLE, marks: [], line: 'musiquita…' },
+    },
+  },
+  work: {
+    place: 'walk',
+    minTicks: 4,
+    // The food back in the pan, or the dance back on both feet
+    canLeave: s => (isCookingAt(s) ? s % TOSS.length === 0 : s % DANCE.length === 0),
+    play: working,
+  },
+  sleep: { place: 'home', play: () => ({ frame: BLINK, marks: [], line: 'zzz' }) },
+  smoke: { place: 'home', minTicks: 4, canLeave: s => s % 8 >= 2, play: s => ({ ...smoking(s), line: 'en mi break' }) },
+  coffee: { place: 'home', minTicks: 4, canLeave: s => s % 16 >= 3, play: s => ({ ...coffee(s), line: 'un cafecito' }) },
+  idle: { place: 'home', play: idling },
+}
+
+// What Clawd is up to, as the director sees it
+export type Context = { idleTicks: number; isWorking: boolean; readingFor?: number; runningFor?: number }
+
+// The loop the context asks for; moments and the cheer come as events instead
+export function want(c: Context): SceneId {
+  if (c.isWorking && c.readingFor !== undefined && c.readingFor >= 0) return 'read'
+  if (c.isWorking && c.runningFor !== undefined && c.runningFor >= MUSIC_AFTER_TICKS) return 'music'
+  if (c.isWorking) return 'work'
+  if (c.idleTicks >= SLEEP_AFTER_TICKS) return 'sleep'
+  if (isSmoking(c.idleTicks)) return isCoffeeBreak(c.idleTicks) ? 'coffee' : 'smoke'
+  return 'idle'
 }
 
 export function viewKey(v: View): string {

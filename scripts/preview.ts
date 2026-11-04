@@ -5,7 +5,9 @@
 // Ctrl+C stops it. Not part of the mod: the engine loads only hooks/.
 
 import { CELEBRATE_TICKS, MOMENT_TICKS, SLEEP_AFTER_TICKS, WIDTH, view } from '../hooks/clawd.ts'
-import type { Frame, View } from '../hooks/clawd.ts'
+import type { Context, Frame, View } from '../hooks/clawd.ts'
+import { cue, pose, start, step } from '../hooks/director.ts'
+import type { Cue } from '../hooks/director.ts'
 import { ROWS, START_X, scene, solo, walk } from '../hooks/desks.ts'
 import type { Agent, Segment } from '../hooks/desks.ts'
 
@@ -17,6 +19,27 @@ const HEIGHT = ROWS + 1
 const HOLD = 40
 
 type Mood = { name: string; about: string; at?: (t: number, columns: number) => View }
+
+// The director through a made-up turn: it works, reads a while, gets two
+// moments at once, waits on a long command, and the turn ends. Each scene
+// waits for the one before to stop cleanly
+const DIRECTED_TICKS = 200
+const DIRECTED_CUES: Record<number, Cue> = { 66: 'cool', 67: 'love', 170: 'celebrate' }
+function directed(t: number, columns: number): View {
+  const ctx = (k: number): Context => ({
+    idleTicks: k < 170 ? 0 : k - 170,
+    isWorking: k < 170,
+    readingFor: k >= 20 && k < 50 ? k - 20 : undefined,
+    runningFor: k >= 110 && k < 150 ? k - 110 : undefined,
+  })
+  let d = start(0)
+  for (let k = 0; k <= t; k++) {
+    const id = DIRECTED_CUES[k]
+    if (id) d = cue(d, id, k)
+    d = step(d, ctx(k), k)
+  }
+  return pose(d, ctx(t), t, columns)
+}
 
 // The poses `view` picks, each held by choosing what it is shown: how long the
 // session has been idle, and whether a turn is running. `agentes` is not a
@@ -37,6 +60,7 @@ const MOODS: Mood[] = [
   { name: 'café', about: 'un rato sin usarlo, otro break: una taza de café', at: (t, c) => view(t, 450, false, c) },
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: (t, c) => view(t, 0, true, c, undefined, undefined, undefined, 8 + t) },
   { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
+  { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
   { name: 'agentes', about: 'con subagentes: cada uno llega con su notebook, teclea, y se va' },
 ]
 const POSES = MOODS.filter(m => m.at)

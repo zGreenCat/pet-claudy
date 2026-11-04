@@ -4,6 +4,10 @@ import type { AgentInfo, AgentSpawnInput, AgentStatus, On } from 'claude-code'
 
 import { TICK_MS } from './clawd'
 
+// The longest a working Clawd takes to reach a point where it can stop: the
+// end of a toss in the pan
+const WAIT = 8
+
 const band = {
   component: 'AbovePrompt' as const,
   props: {
@@ -195,8 +199,8 @@ test('tests that pass put on the sunglasses; tests that fail do not', async ($, 
 
   isError = false
   await $.tool.call({ tool: 'Bash', command: 'npm test', description: 'Run tests' })
-  // The glasses go on first
-  await e.ticks(5)
+  // The dance ends its turn, then the glasses go on first
+  await e.ticks(WAIT + 5)
   expect(await shows($, /todo en verde/)).toBe(true)
   await e.ticks(30)
   expect(await shows($, /todo en verde/)).toBe(false)
@@ -212,6 +216,7 @@ test('reads one after another sit Clawd down to read, until they stop', async ($
   await $.tool.call({ tool: 'Read', file_path: '/b.ts' })
   expect(await shows($, /leyendo/)).toBe(false)
   await $.tool.call({ tool: 'Read', file_path: '/c.ts' })
+  await e.ticks(WAIT)
   expect(await shows($, /leyendo/)).toBe(true)
 
   // A while with nothing read and it gets up
@@ -228,6 +233,7 @@ test('two subagents at once make Clawd super, one alone does not', async ($, on)
   await e.ticks(2)
   await $.agent.spawn(spawnOf('dos'))
   // The collar shows on Clawd beside the desks
+  await e.ticks(WAIT)
   expect(await shows($, /▔/)).toBe(true)
 })
 
@@ -235,7 +241,7 @@ test('a long command puts the headphones on until it ends', async ($, on) => {
   const e = engine(on)
   on('classic.PreToolUse', () => ({}))
   on('tool.call', async () => {
-    await e.clock.sleep(4000)
+    await e.clock.sleep(6000)
     return { result: { stdout: '', stderr: '', interrupted: false }, text: '' }
   })
   await start($)
@@ -243,10 +249,12 @@ test('a long command puts the headphones on until it ends', async ($, on) => {
   const call = $.tool.call({ tool: 'Bash', command: 'npm run build', description: 'Build' })
   await e.ticks(4)
   expect(await shows($, /musiquita/)).toBe(false)
-  await e.ticks(6)
+  await e.ticks(6 + WAIT)
   expect(await shows($, /musiquita/)).toBe(true)
-  await e.ticks(8)
+  await e.ticks(10)
   await call
+  // The headphones come off at the end of a beat
+  await e.ticks(6)
   expect(await shows($, /musiquita/)).toBe(false)
 })
 
@@ -268,6 +276,6 @@ test('three failures in a row leave Clawd dizzy; one that works resets the count
   await e.ticks(2)
   expect(await shows($, /mareado/)).toBe(false)
   await run()
-  await e.ticks(2)
+  await e.ticks(WAIT + 2)
   expect(await shows($, /mareado/)).toBe(true)
 })

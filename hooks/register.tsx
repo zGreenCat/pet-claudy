@@ -3,7 +3,6 @@ import type { AgentStatus, Register } from 'claude-code'
 
 import type { Tick } from '../types'
 import {
-  CELEBRATE_TICKS,
   ERRORS_TO_DIZZY,
   READING_LINGER_TICKS,
   READS_TO_START,
@@ -14,11 +13,11 @@ import {
   cueOf,
   isRead,
   isThanks,
-  view,
   viewKey,
 } from './clawd'
-import type { Frame, Moment, Mood } from './clawd'
+import type { Context, Frame } from './clawd'
 import { START_X, describe, oneLine, scene, solo, summary, walk } from './desks'
+import { cue, pose, reset, start, step } from './director'
 import type { Agent, Segment } from './desks'
 import { registerGame, registerGameCommand, trackPrompt, trackTurn } from './game-register'
 import { registerMoodCommand, registerMoods } from './mood-register'
@@ -44,15 +43,11 @@ export const register: Register = (on, options) => {
   let isWorking = false
   let bodyColumns = 80
   let lastKey = ''
-  // The tick the main loop's last turn ended; far back, so none to celebrate
-  let finishedAt = -CELEBRATE_TICKS
   // The subagents at their desks, in seat order
   let agents: Agent[] = []
   let failures = 0
-  // The moment Clawd is having and the tick it began
-  let cue: { mood: Mood; at: number } | undefined
-
-  const now = (): Moment | undefined => (cue ? { mood: cue.mood, since: t - cue.at } : undefined)
+  // The scene Clawd is playing, and the moments and cheer waiting their turn
+  let director = start(t)
   // The ticks of the main loop's recent reads, and the tick it sat down to read
   let reads: number[] = []
   let readingFrom: number | undefined
@@ -67,22 +62,27 @@ export const register: Register = (on, options) => {
   let errors = 0
 
   const isBusy = () => isWorking || agents.some(a => a.doneAt === undefined)
+  const context = (): Context => ({ idleTicks, isWorking: isBusy(), readingFor: readingFor(), runningFor: runningFor() })
+  // What Clawd shows now. Stepping the director here, not only on the clock,
+  // lets an event show at once when the scene it waits on can already end
+  function shown() {
+    director = step(director, context(), t)
+    return pose(director, context(), t, bodyColumns)
+  }
 
   function drawKey(): string {
-    if (agents.length === 0) {
-      return viewKey(view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor(), runningFor()))
-    }
+    if (agents.length === 0) return viewKey(shown())
     return `T${JSON.stringify(desksScene())}`
   }
 
   function soloScene(): Segment[][] {
-    const v = view(t, idleTicks, isWorking, bodyColumns, t - finishedAt, now(), readingFor(), runningFor())
+    const v = shown()
     return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns)
   }
 
   function desksScene() {
     // Clawd alone, not what it holds: the desks start right beside it
-    const frame = view(t, idleTicks, isBusy(), bodyColumns, undefined, now()).frame.map(r => r.slice(0, WIDTH)) as Frame
+    const frame = shown().frame.map(r => r.slice(0, WIDTH)) as Frame
     return scene(t, agents, frame, isWorking ? 'dirigiendo' : 'esperando', bodyColumns)
   }
 
@@ -116,7 +116,7 @@ export const register: Register = (on, options) => {
             else if (ENDED[info.status]) {
               finish(a.id, ENDED[info.status]!)
               // A subagent that failed or was stopped leaves Clawd dizzy
-              if (info.status !== 'completed') cue = { mood: 'dizzy', at: t }
+              if (info.status !== 'completed') director = cue(director, 'dizzy', t)
             }
           }
         }
@@ -164,7 +164,7 @@ export const register: Register = (on, options) => {
       seat(started.agentId, e.subagentType, oneLine(e.description))
       // Two or more at once: Clawd suits up
       spawns = [...spawns.filter(s => t - s < SUPER_WINDOW_TICKS), t]
-      if (spawns.length >= 2 && cue?.mood !== 'super') cue = { mood: 'super', at: t }
+      if (spawns.length >= 2) director = cue(director, 'super', t)
     }
     return started
   }).catch(($, e, next) => next(e))
@@ -200,19 +200,20 @@ export const register: Register = (on, options) => {
     }
     const isOk = answer.deny === undefined && answer.isError !== true
     const mood = cueOf(e.tool, input, isOk)
-    if (mood) cue = { mood, at: t }
+    if (mood) director = cue(director, mood, t)
     // Failure after failure leaves it dizzy
     if (e.agentId === undefined) {
       errors = isOk ? 0 : errors + 1
-      if (errors === ERRORS_TO_DIZZY) cue = { mood: 'dizzy', at: t }
+      if (errors === ERRORS_TO_DIZZY) director = cue(director, 'dizzy', t)
     }
     return answer
   }).catch(($, e, next) => next(e))
 
-  // A turn of the main loop that answered: Clawd cheers; a new prompt cuts it short
+  // A turn of the main loop that answered: Clawd cheers once what it is doing
+  // can stop; a new prompt cuts it short
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined && e.reason === 'answer') {
-      finishedAt = t
+      director = cue(director, 'celebrate', t)
       isWorking = false
       idleTicks = 0
       reads = []
@@ -223,8 +224,8 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('prompt.submit', async ($, e, next) => {
-    finishedAt = -CELEBRATE_TICKS
-    cue = isThanks(e.text) ? { mood: 'love', at: t } : undefined
+    director = reset(director, context(), t)
+    if (isThanks(e.text)) director = cue(director, 'love', t)
     await trackPrompt($, e)
     return next(e)
   }).catch(($, e, next) => next(e))

@@ -40,6 +40,7 @@ See every mood without running a session (Node 23.6 or newer):
 node scripts/preview.ts ?        # list the moods
 node scripts/preview.ts cocina   # play one
 node scripts/preview.ts todos    # play them in turn
+node scripts/preview.ts cambios  # a made-up turn, scene after scene
 ```
 
 ## Develop
