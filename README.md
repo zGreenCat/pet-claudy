@@ -48,6 +48,14 @@ node scripts/preview.ts cambios  # a made-up turn, scene after scene
 node scripts/preview.ts gorro    # the Santa hat over the poses that move the head
 ```
 
+## Pixel editor
+
+`scripts/editor.html` opens in a browser and draws Clawd with the terminal's
+rules: two pixels to a cell each way, cells twice as tall as wide, two colors
+to a cell. Paint an accessory over the poses, check the terminal preview, and
+copy the JSON out. It opens with the poses the plugin draws now; after
+changing an accessory, refresh them with `node scripts/editor-poses.ts`.
+
 ## Develop
 
 Clawd shares the area above the prompt with other plugins, including image-preview.

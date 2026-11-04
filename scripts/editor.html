@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taller de píxeles de Clawd</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* One visual world: a dark terminal, Clawd's orange as the accent.
+     Layout: tools on the left, the canvas and the terminal preview stacked on the right. */
+  --bg: #17151a;
+  --panel: #221f25;
+  --line: #3a3540;
+  --text: #ece7e3;
+  --muted: #a59d99;
+  --accent: #D77757;
+  --warn: #f0b429;
+  --bad: #ef5b5b;
+  --display: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--body); }
+main { display: grid; grid-template-columns: 280px 1fr; gap: 20px; padding: 20px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+h1 { font: 600 20px/1.2 var(--display); margin: 0 0 4px; text-wrap: balance; }
+h2 { font: 600 13px/1.2 var(--display); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+p { margin: 0; color: var(--muted); max-width: 65ch; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 12px; }
+aside { display: grid; gap: 16px; align-content: start; }
+section.work { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select, input[type=text] {
+  font: 13px/1 var(--display); color: var(--text); background: #2c2830; border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 10px; cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button[aria-pressed=true] { background: var(--accent); color: #1a1210; border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.sw { aspect-ratio: 1; border-radius: 6px; border: 2px solid transparent; padding: 0; position: relative; }
+.sw[aria-pressed=true] { border-color: var(--text); background: inherit; }
+.sw.empty { background: repeating-conic-gradient(#3a3540 0 25%, #2a262d 0 50%) 0 0/10px 10px; }
+.sw .k { position: absolute; right: 3px; bottom: 1px; font: 600 10px var(--display); color: #000; mix-blend-mode: difference; filter: invert(1); }
+label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.frames { display: flex; flex-wrap: wrap; gap: 6px; }
+.frames button { font-size: 12px; }
+.canvas-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; }
+canvas { display: block; image-rendering: pixelated; touch-action: none; }
+#edit { cursor: crosshair; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; font: 12px var(--display); }
+.pill { padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.ok { color: #9fd38a; border-color: #4b6b3f; }
+.pill.bad { color: var(--bad); border-color: #7a3434; }
+textarea { width: 100%; min-height: 140px; font: 12px/1.4 var(--display); color: var(--text); background: #141216; border: 1px solid var(--line); border-radius: 6px; padding: 8px; resize: vertical; }
+.hint { font-size: 13px; }
+kbd { font: 12px var(--display); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.term { background: #0d0c0f; border-radius: 8px; padding: 12px; display: inline-block; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <aside>
+    <div>
+      <h1>Taller de píxeles de Clawd</h1>
+      <p class="hint">Cada celda del terminal son 2×2 píxeles, dos veces más alta que ancha, y solo admite dos colores (contando el vacío). Pinta, mira la vista de terminal y copia el JSON para pasármelo.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Herramienta</h2>
+      <div class="row" id="tools">
+        <button id="t-pen" data-tool="pen" aria-pressed="true">Lápiz</button>
+        <button id="t-erase" data-tool="erase" aria-pressed="false">Goma</button>
+        <button id="t-pick" data-tool="pick" aria-pressed="false">Gotero</button>
+        <button id="t-fill" data-tool="fill" aria-pressed="false">Relleno</button>
+      </div>
+      <div class="row">
+        <button id="undo">Deshacer</button>
+        <button id="clear">Vaciar capa</button>
+      </div>
+      <p class="hint"><kbd>clic derecho</kbd> borra · <kbd>Ctrl+Z</kbd> deshace</p>
+    </div>
+
+    <div class="panel">
+      <h2>Color</h2>
+      <div class="swatches" id="swatches"></div>
+      <label for="custom">Otro color <input type="color" id="custom" value="#4aa3a2"></label>
+    </div>
+
+    <div class="panel">
+      <h2>Capa</h2>
+      <div class="row">
+        <button id="l-extra" data-layer="extra" aria-pressed="true">Accesorio</button>
+        <button id="l-clawd" data-layer="clawd" aria-pressed="false">Clawd</button>
+      </div>
+      <label for="dim"><input type="checkbox" id="dim" checked> Atenuar la otra capa</label>
+      <label for="grid"><input type="checkbox" id="grid" checked> Mostrar celdas</label>
+    </div>
+  </aside>
+
+  <section class="work">
+    <div class="panel">
+      <h2>Fotogramas</h2>
+      <div class="frames" id="frames"></div>
+      <div class="row">
+        <input type="text" id="fname" aria-label="Nombre del fotograma" placeholder="nombre del fotograma">
+        <button id="rename">Renombrar</button>
+        <button id="dup">Duplicar</button>
+        <button id="newf">Nuevo vacío</button>
+        <button id="delf">Borrar</button>
+        <button id="play" aria-pressed="false">Reproducir</button>
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="edit" tabindex="0" aria-label="Lienzo de píxeles"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>Vista de terminal</h2>
+      <div class="status" id="status"></div>
+      <div class="term"><canvas id="term" aria-label="Cómo se verá en el terminal"></canvas></div>
+      <p class="hint">Así lo pintaría el plugin: en una celda con más de dos colores, el tercero se pierde. Las celdas marcadas en rojo en el lienzo son las que no caben.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Exportar / importar</h2>
+      <div class="row">
+        <button id="copy">Copiar JSON</button>
+        <button id="load">Cargar JSON pegado</button>
+        <button id="reset">Volver a los ejemplos</button>
+        <span id="msg" class="hint" role="status"></span>
+      </div>
+      <textarea id="json" aria-label="JSON del diseño" spellcheck="false"></textarea>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const COLS = 20, ROWS = 4;           // terminal cells: the band above the prompt is 4 rows
+  const PW = COLS * 2, PH = ROWS * 2;  // pixels
+  const PALETTE = {
+    o: '#D77757', k: '#1A1A1A', w: '#F2F2F2', r: '#D93A3A', c: '#C8323C', b: '#2E6FD0',
+    n: '#3E3A7A', p: '#E4DCCB', g: '#9AA0A8', m: '#6B4430', y: '#F2C14E', e: '#8DB360',
+    i: '#E58FD0', q: '#7FD1E8', s: '#6B7280', h: '#8B5A2B',
+  };
+  const NAMES = { o: 'naranja Clawd', k: 'ojos', w: 'blanco', r: 'rojo gorro', c: 'rojo capa', b: 'azul audífonos', n: 'azul libro', p: 'páginas', g: 'taza', m: 'café', y: 'dorado', e: 'verde', i: 'rosa', q: 'celeste', s: 'sartén', h: 'mango' };
+  const FREE = 'abdfjlstuvxzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(k => !(k in PALETTE));
+
+  // The plugin's sprite letters as 2x2 pixels: upper left, upper right, lower left, lower right
+  const SPRITE = {
+    O: 'oooo', L: 'ooko', R: 'oook', '-': 'oooo', m: 'ookk', '@': 'ooko', '┓': 'ooko', '┏': 'oook',
+    s: 'ookk', S: 'kkoo', l: 'kooo', r: 'okoo', c: '..ww', C: '..rr', Y: '..yy',
+    '^': 'oo..', v: '..oo', a: 'o...', b: '.o..', y: '..o.', z: '...o', '.': '....',
+  };
+  const QUARTERS = ' ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█';
+  const blank = () => Array.from({ length: PH }, () => Array(PW).fill('.'));
+
+  function fromSprite(rows) {
+    const g = blank();
+    rows.forEach((row, i) => [...row].forEach((ch, x) => {
+      const q = SPRITE[ch] || '....';
+      const top = (i + 1) * 2;
+      g[top][x * 2] = q[0]; g[top][x * 2 + 1] = q[1]; g[top + 1][x * 2] = q[2]; g[top + 1][x * 2 + 1] = q[3];
+    }));
+    return g;
+  }
+  // Marks as the plugin draws them: a quarter glyph lit in fg, the rest in bg
+  function fromMarks(marks) {
+    const g = blank();
+    for (const mk of marks) [...mk.text].forEach((ch, k) => {
+      const bits = QUARTERS.indexOf(ch), x = mk.x + k;
+      [[0, 0, 1], [0, 1, 2], [1, 0, 4], [1, 1, 8]].forEach(([dy, dx, bit]) => {
+        let v = bits & bit ? mk.fg : mk.bg;
+        if (v === 'claude') v = 'o';
+        if (v && v.startsWith('#')) v = Object.keys(PALETTE).find(key => PALETTE[key].toUpperCase() === v.toUpperCase()) || '.';
+        if (v && v !== 'o') g[mk.row * 2 + dy][x * 2 + dx] = v;
+      });
+    });
+    return g;
+  }
+  // The hat as the plugin draws it now: drawn once for a head up, the other
+  // poses worked out from it (hooks/accessories.ts)
+  const POSES = [{"name":"gorro · quieto","sprite":[".OLOORO.","^OOOOOO^",".aa..bb."],"marks":[{"row":0,"x":2,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":3,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":4,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":5,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":6,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":7,"text":" ","fg":"#D93A3A","bg":"#D93A3A"},{"row":0,"x":8,"text":"▙","fg":"#D93A3A"},{"row":0,"x":1,"text":"▄","fg":"#F2F2F2"},{"row":0,"x":9,"text":"▖","fg":"#D93A3A"},{"row":1,"x":8,"text":"▝","fg":"#D93A3A"},{"row":1,"x":9,"text":"▀","fg":"#F2F2F2"}]},{"name":"gorro · brazos arriba","sprite":["vOLOOROv",".OOOOOO.",".bb..aa."],"marks":[{"row":0,"x":2,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":3,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":4,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":5,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":6,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":7,"text":" ","fg":"#D93A3A","bg":"#D93A3A"},{"row":0,"x":8,"text":"▙","fg":"#D93A3A"},{"row":0,"x":1,"text":"▄","fg":"#F2F2F2"},{"row":0,"x":9,"text":"▖","fg":"#D93A3A"},{"row":1,"x":8,"text":"▝","fg":"#D93A3A"},{"row":1,"x":9,"text":"▀","fg":"#F2F2F2"}]},{"name":"gorro · cabeza hundida","sprite":[".vvvvvv......","vOmOOmOv.....",".aa..bb."],"marks":[{"row":0,"x":2,"text":"▄","fg":"#D93A3A"},{"row":0,"x":3,"text":"▄","fg":"#D93A3A"},{"row":0,"x":4,"text":"▄","fg":"#D93A3A"},{"row":0,"x":5,"text":"▄","fg":"#D93A3A"},{"row":0,"x":6,"text":"▄","fg":"#D93A3A"},{"row":0,"x":7,"text":"▄","fg":"#D93A3A"},{"row":0,"x":8,"text":"▖","fg":"#D93A3A"},{"row":1,"x":1,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":2,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":3,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":4,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":5,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":6,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":7,"text":"▀","fg":"#D93A3A"},{"row":1,"x":8,"text":"▜","fg":"#D93A3A"},{"row":1,"x":9,"text":"▄","fg":"#F2F2F2"}]},{"name":"gorro · tambaleo","sprite":[".vvvvvv.","vO@OO@Ov",".aa..bb."],"marks":[{"row":0,"x":2,"text":"▄","fg":"#D93A3A"},{"row":0,"x":3,"text":"▄","fg":"#D93A3A"},{"row":0,"x":4,"text":"▄","fg":"#D93A3A"},{"row":0,"x":5,"text":"▄","fg":"#D93A3A"},{"row":0,"x":6,"text":"▄","fg":"#D93A3A"},{"row":0,"x":7,"text":"▄","fg":"#D93A3A"},{"row":0,"x":8,"text":"▖","fg":"#D93A3A"},{"row":1,"x":1,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":2,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":3,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":4,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":5,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":6,"text":"▀","fg":"#F2F2F2","bg":"claude"},{"row":1,"x":7,"text":"▀","fg":"#D93A3A"},{"row":1,"x":8,"text":"▜","fg":"#D93A3A"},{"row":1,"x":9,"text":"▄","fg":"#F2F2F2"}]},{"name":"gorro · caído","sprite":[".zz..yy.","vOOOOOOv",".O@OO@O."],"marks":[{"row":3,"x":10,"text":"▀","fg":"#F2F2F2","bg":"#D93A3A"},{"row":3,"x":11,"text":"▀","fg":"#F2F2F2","bg":"#D93A3A"},{"row":3,"x":12,"text":"▀","fg":"#F2F2F2","bg":"#D93A3A"},{"row":3,"x":13,"text":"▀","fg":"#F2F2F2","bg":"#D93A3A"},{"row":3,"x":14,"text":"▀","fg":"#F2F2F2","bg":"#D93A3A"},{"row":3,"x":15,"text":" ","fg":"#D93A3A","bg":"#D93A3A"},{"row":3,"x":16,"text":"▛","fg":"#D93A3A"},{"row":3,"x":9,"text":"▀","fg":"#F2F2F2"},{"row":3,"x":17,"text":"▘","fg":"#D93A3A"},{"row":2,"x":16,"text":"▗","fg":"#D93A3A"},{"row":2,"x":17,"text":"▄","fg":"#F2F2F2"}]},{"name":"gorro · fumando","sprite":[".O-OO-OcccY","^OOOOOO^",".aa..bb."],"marks":[{"row":0,"x":2,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":3,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":4,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":5,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":6,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":7,"text":" ","fg":"#D93A3A","bg":"#D93A3A"},{"row":0,"x":8,"text":"▙","fg":"#D93A3A"},{"row":0,"x":1,"text":"▄","fg":"#F2F2F2"},{"row":0,"x":9,"text":"▖","fg":"#D93A3A"}]},{"name":"gorro · cool","sprite":[".ssssss.","^OSlrSO^",".aa..bb."],"marks":[{"row":0,"x":2,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":3,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":4,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":5,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":6,"text":"▀","fg":"#D93A3A","bg":"#F2F2F2"},{"row":0,"x":7,"text":" ","fg":"#D93A3A","bg":"#D93A3A"},{"row":0,"x":8,"text":"▙","fg":"#D93A3A"},{"row":0,"x":1,"text":"▄","fg":"#F2F2F2"},{"row":0,"x":9,"text":"▖","fg":"#D93A3A"},{"row":1,"x":8,"text":"▝","fg":"#D93A3A"},{"row":1,"x":9,"text":"▀","fg":"#F2F2F2"}]}];
+
+  const examples = () => ({
+    cols: COLS, rows: ROWS, palette: { ...PALETTE },
+    frames: [
+      ...POSES.map(p => ({ name: p.name, clawd: fromSprite(p.sprite), extra: fromMarks(p.marks) })),
+      { name: 'en blanco', clawd: fromSprite(['.OLOORO.', '^OOOOOO^', '.aa..bb.']), extra: blank() },
+    ],
+  });
+
+  const STORE = 'clawd-pixel-workshop-v2';
+  let doc;
+  try { doc = JSON.parse(localStorage.getItem(STORE)); } catch { doc = null; }
+  if (!valid(doc)) doc = examples();
+  let cur = 0, tool = 'pen', layer = 'extra', color = 'r', undo = [], playing = null;
+
+  const $ = id => document.getElementById(id);
+  const edit = $('edit'), term = $('term');
+  const ectx = edit.getContext('2d'), tctx = term.getContext('2d');
+  const PX = 16, PY = 32;      // a pixel on the canvas: half a cell wide, half a cell tall
+  edit.width = PW * PX; edit.height = PH * PY;
+  const TX = 6, TY = 12;       // the terminal preview, smaller
+  term.width = PW * TX; term.height = PH * TY;
+
+  function valid(d) {
+    return d && Array.isArray(d.frames) && d.frames.length > 0 && d.frames.every(f =>
+      Array.isArray(f.clawd) && f.clawd.length === PH && Array.isArray(f.extra) && f.extra.length === PH);
+  }
+  function normalize(d) {
+    const rows = g => Array.from({ length: PH }, (_, y) => Array.from({ length: PW }, (_, x) => (Array.isArray(g[y]) ? g[y][x] : (g[y] || '')[x]) || '.'));
+    return { cols: COLS, rows: ROWS, palette: { ...PALETTE, ...(d.palette || {}) }, frames: d.frames.map(f => ({ name: String(f.name || 'fotograma'), clawd: rows(f.clawd), extra: rows(f.extra) })) };
+  }
+  doc = normalize(doc);
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(doc)); } catch {} };
+  const frame = () => doc.frames[cur];
+  const composite = f => f.clawd.map((row, y) => row.map((v, x) => (f.extra[y][x] !== '.' ? f.extra[y][x] : v)));
+
+  // The plugin's encoding of one cell: its colors, and what it can draw of them
+  function encode(px) {
+    const colors = [...new Set(px.filter(p => p !== '.'))];
+    const full = px.every(p => p !== '.');
+    const count = c => px.filter(p => p === c).length;
+    colors.sort((a, b) => count(a) - count(b));
+    const fits = full ? colors.length <= 2 : colors.length <= 1;
+    if (colors.length === 0) return { fits, draw: px };
+    if (full) {
+      const bg = colors[colors.length - 1], fg = colors[0];
+      return { fits, draw: px.map(p => (p === bg ? bg : fg)) };
+    }
+    return { fits, draw: px.map(p => (p === '.' ? '.' : colors[0])) };
+  }
+  const cellPx = (g, cx, cy) => [g[cy * 2][cx * 2], g[cy * 2][cx * 2 + 1], g[cy * 2 + 1][cx * 2], g[cy * 2 + 1][cx * 2 + 1]];
+
+  function drawEdit() {
+    const f = frame(), dim = $('dim').checked;
+    ectx.fillStyle = '#0d0c0f'; ectx.fillRect(0, 0, edit.width, edit.height);
+    for (let y = 0; y < PH; y++) for (let x = 0; x < PW; x++) {
+      const mine = f[layer][y][x];
+      const other = f[layer === 'extra' ? 'clawd' : 'extra'][y][x];
+      const v = mine !== '.' ? mine : other;
+      if (v === '.') continue;
+      ectx.globalAlpha = mine === '.' && dim ? 0.35 : 1;
+      ectx.fillStyle = doc.palette[v] || '#ff00ff';
+      ectx.fillRect(x * PX, y * PY, PX, PY);
+    }
+    ectx.globalAlpha = 1;
+    if ($('grid').checked) {
+      ectx.strokeStyle = 'rgba(255,255,255,.06)'; ectx.lineWidth = 1;
+      for (let x = 0; x <= PW; x++) { ectx.beginPath(); ectx.moveTo(x * PX + .5, 0); ectx.lineTo(x * PX + .5, edit.height); ectx.stroke(); }
+      for (let y = 0; y <= PH; y++) { ectx.beginPath(); ectx.moveTo(0, y * PY + .5); ectx.lineTo(edit.width, y * PY + .5); ectx.stroke(); }
+      ectx.strokeStyle = 'rgba(255,255,255,.18)';
+      for (let x = 0; x <= COLS; x++) { ectx.beginPath(); ectx.moveTo(x * PX * 2 + .5, 0); ectx.lineTo(x * PX * 2 + .5, edit.height); ectx.stroke(); }
+      for (let y = 0; y <= ROWS; y++) { ectx.beginPath(); ectx.moveTo(0, y * PY * 2 + .5); ectx.lineTo(edit.width, y * PY * 2 + .5); ectx.stroke(); }
+    }
+    // Cells that do not fit in a terminal cell
+    const all = composite(f);
+    ectx.strokeStyle = '#ef5b5b'; ectx.lineWidth = 3;
+    for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
+      if (!encode(cellPx(all, cx, cy)).fits) ectx.strokeRect(cx * PX * 2 + 2, cy * PY * 2 + 2, PX * 2 - 4, PY * 2 - 4);
+    }
+  }
+
+  function drawTerm(f) {
+    const all = composite(f);
+    tctx.fillStyle = '#0d0c0f'; tctx.fillRect(0, 0, term.width, term.height);
+    let bad = 0, used = new Set();
+    for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
+      const { fits, draw } = encode(cellPx(all, cx, cy));
+      if (!fits) bad++;
+      draw.forEach((v, k) => {
+        if (v === '.') return;
+        used.add(v);
+        tctx.fillStyle = doc.palette[v] || '#ff00ff';
+        tctx.fillRect((cx * 2 + (k & 1)) * TX, (cy * 2 + (k >> 1)) * TY, TX, TY);
+      });
+    }
+    $('status').innerHTML =
+      `<span class="pill ${bad ? 'bad' : 'ok'}">${bad ? bad + (bad === 1 ? ' celda no cabe' : ' celdas no caben') : 'todas las celdas caben'}</span>` +
+      `<span class="pill">${used.size} colores</span><span class="pill">${COLS}×${ROWS} celdas · ${PW}×${PH} píxeles</span>`;
+  }
+
+  function drawFrames() {
+    $('frames').innerHTML = '';
+    doc.frames.forEach((f, i) => {
+      const b = document.createElement('button');
+      b.textContent = f.name; b.setAttribute('aria-pressed', String(i === cur));
+      b.addEventListener('click', () => { stop(); cur = i; undo = []; render(); });
+      $('frames').appendChild(b);
+    });
+    $('fname').value = frame().name;
+  }
+
+  function drawSwatches() {
+    $('swatches').innerHTML = '';
+    for (const [k, hex] of Object.entries(doc.palette)) {
+      const b = document.createElement('button');
+      b.className = 'sw'; b.style.background = hex; b.title = `${NAMES[k] || 'color'} (${k}) ${hex}`;
+      b.setAttribute('aria-label', b.title); b.setAttribute('aria-pressed', String(k === color));
+      b.innerHTML = `<span class="k">${k}</span>`;
+      b.addEventListener('click', () => { color = k; if (tool === 'erase' || tool === 'pick') setTool('pen'); drawSwatches(); });
+      $('swatches').appendChild(b);
+    }
+  }
+
+  function render() { drawFrames(); drawEdit(); drawTerm(frame()); $('json').value = JSON.stringify(exportDoc(), null, 1); save(); }
+
+  function exportDoc() {
+    return { cols: COLS, rows: ROWS, palette: doc.palette, frames: doc.frames.map(f => ({ name: f.name, clawd: f.clawd.map(r => r.join('')), extra: f.extra.map(r => r.join('')) })) };
+  }
+
+  function setTool(t) { tool = t; document.querySelectorAll('#tools button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); }
+  document.querySelectorAll('#tools button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+  document.querySelectorAll('[data-layer]').forEach(b => b.addEventListener('click', () => {
+    layer = b.dataset.layer; document.querySelectorAll('[data-layer]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); drawEdit();
+  }));
+  $('dim').addEventListener('change', drawEdit);
+  $('grid').addEventListener('change', drawEdit);
+
+  $('custom').addEventListener('change', e => {
+    const hex = e.target.value.toUpperCase();
+    let k = Object.keys(doc.palette).find(key => doc.palette[key].toUpperCase() === hex);
+    if (!k) { k = FREE.find(key => !(key in doc.palette)); if (!k) return; doc.palette[k] = hex; }
+    color = k; setTool('pen'); drawSwatches(); render();
+  });
+
+  function at(e) {
+    const r = edit.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) / r.width * PW), y = Math.floor((e.clientY - r.top) / r.height * PH);
+    return x >= 0 && x < PW && y >= 0 && y < PH ? [x, y] : null;
+  }
+  const grid = () => frame()[layer];
+  function snapshot() { undo.push(grid().map(r => r.slice())); if (undo.length > 100) undo.shift(); }
+  function fill(x, y, v) {
+    const g = grid(), from = g[y][x]; if (from === v) return;
+    const stack = [[x, y]];
+    while (stack.length) {
+      const [a, b] = stack.pop();
+      if (a < 0 || b < 0 || a >= PW || b >= PH || g[b][a] !== from) continue;
+      g[b][a] = v; stack.push([a + 1, b], [a - 1, b], [a, b + 1], [a, b - 1]);
+    }
+  }
+  let painting = null;
+  function apply(e) {
+    const p = at(e); if (!p) return;
+    const [x, y] = p, g = grid();
+    const erase = painting === 'erase' || tool === 'erase';
+    if (tool === 'pick' && painting !== 'erase') {
+      const v = composite(frame())[y][x]; if (v !== '.') { color = v; drawSwatches(); setTool('pen'); } return;
+    }
+    if (tool === 'fill' && painting !== 'erase') { fill(x, y, color); } else g[y][x] = erase ? '.' : color;
+    drawEdit(); drawTerm(frame());
+  }
+  edit.addEventListener('contextmenu', e => e.preventDefault());
+  edit.addEventListener('pointerdown', e => {
+    stop(); snapshot(); painting = e.button === 2 ? 'erase' : 'paint';
+    edit.setPointerCapture(e.pointerId); apply(e);
+  });
+  edit.addEventListener('pointermove', e => { if (painting && tool !== 'fill' && tool !== 'pick') apply(e); });
+  const end = () => { if (painting) { painting = null; render(); } };
+  edit.addEventListener('pointerup', end); edit.addEventListener('pointercancel', end);
+
+  function doUndo() { const g = undo.pop(); if (g) { frame()[layer] = g; render(); } }
+  $('undo').addEventListener('click', doUndo);
+  document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') { e.preventDefault(); doUndo(); } });
+  $('clear').addEventListener('click', () => { snapshot(); frame()[layer] = blank(); render(); });
+
+  $('rename').addEventListener('click', () => { const n = $('fname').value.trim(); if (n) { frame().name = n; render(); } });
+  $('dup').addEventListener('click', () => { const f = frame(); doc.frames.splice(cur + 1, 0, { name: f.name + ' (copia)', clawd: f.clawd.map(r => r.slice()), extra: f.extra.map(r => r.slice()) }); cur++; undo = []; render(); });
+  $('newf').addEventListener('click', () => { doc.frames.push({ name: 'nuevo ' + (doc.frames.length + 1), clawd: blank(), extra: blank() }); cur = doc.frames.length - 1; undo = []; render(); });
+  $('delf').addEventListener('click', () => { if (doc.frames.length < 2) return; doc.frames.splice(cur, 1); cur = Math.max(0, cur - 1); undo = []; render(); });
+
+  // Plays the frames in turn at the plugin's tick, 250 ms, in the terminal preview
+  function stop() { if (playing) { clearInterval(playing); playing = null; $('play').setAttribute('aria-pressed', 'false'); $('play').textContent = 'Reproducir'; drawTerm(frame()); } }
+  $('play').addEventListener('click', () => {
+    if (playing) return stop();
+    let k = 0; $('play').setAttribute('aria-pressed', 'true'); $('play').textContent = 'Detener';
+    playing = setInterval(() => { drawTerm(doc.frames[k % doc.frames.length]); k++; }, 250);
+  });
+
+  const say = t => { $('msg').textContent = t; setTimeout(() => { if ($('msg').textContent === t) $('msg').textContent = ''; }, 3000); };
+  $('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('json').value); say('Copiado. Pégamelo en el chat.'); }
+    catch { $('json').select(); say('No se pudo copiar solo: el texto quedó seleccionado, usa Ctrl+C.'); }
+  });
+  $('load').addEventListener('click', () => {
+    try {
+      const d = JSON.parse($('json').value);
+      if (!valid(d)) throw new Error(`cada fotograma necesita "clawd" y "extra" con ${PH} filas`);
+      doc = normalize(d); cur = 0; undo = []; drawSwatches(); render(); say('Diseño cargado.');
+    } catch (err) { say('No se pudo cargar: ' + err.message); }
+  });
+  $('reset').addEventListener('click', () => { stop(); doc = examples(); cur = 0; undo = []; drawSwatches(); render(); say('Ejemplos restaurados.'); });
+
+  drawSwatches(); render();
+})();
+</script>
+</body>
+</html>
