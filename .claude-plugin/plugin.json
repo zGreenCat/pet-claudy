@@ -1,6 +1,6 @@
 {
   "name": "clawd-buddy",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "Clawd, the Claude Code mascot, dancing above the prompt, with a small buddy at a laptop for each subagent, saying what it is doing",
   "author": {
     "name": "varay"
@@ -17,6 +17,17 @@
         "azar",
         "cigarro",
         "cafe"
+      ]
+    },
+    "hat": {
+      "type": "string",
+      "title": "Gorro de Clawd",
+      "description": "Cuándo usa Clawd su gorro de Navidad: solo en diciembre, siempre o nunca.",
+      "default": "diciembre",
+      "options": [
+        "diciembre",
+        "siempre",
+        "nunca"
       ]
     }
   }

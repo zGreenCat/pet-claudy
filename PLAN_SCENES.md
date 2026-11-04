@@ -1,7 +1,7 @@
 # Plan: escenas y accesorios
 
-Estado: el director de escenas está implementado (0.14.1); la capa de
-accesorios es diseño propuesto, sin implementar.
+Estado: el director de escenas (0.14.1) y la capa de accesorios con el gorro
+de Navidad (0.15.0) están implementados.
 
 ## Objetivo
 
@@ -47,28 +47,38 @@ dormir). Los momentos y el festejo llegan como eventos a una cola.
 Este registro es la etapa 2 de `PLAN_MOODS.md`: si se implementan las
 variantes, se declaran como escenas.
 
-## Capa de accesorios (propuesta)
+## Capa de accesorios (hecho)
 
-Un accesorio se dibuja como una capa sobre la pose, anclado a la cabeza o al
-cuerpo, sin tocar las escenas.
+Un accesorio se dibuja como marcas sobre la pose, sin tocar las escenas
+(`hooks/accessories.ts`).
 
-- **Anclas en las poses.** Cada pose expone dónde está la cabeza: `up` por
-  defecto (fila sobre las columnas de Clawd); solo las excepciones lo declaran:
-  `sunk` (cabeza medio cuadro abajo: respiración del cariño, al tambalearse en
-  el mareo) y `down` (de cabeza, `FALLEN`). Las poses nuevas heredan `up`.
-- **El accesorio se declara una vez:** `{ id, slot, pixels, when }`. El dibujo
-  usa `quarters()`; la versión `sunk` se obtiene bajando el dibujo un píxel
-  (medio cuadro). En `down` se oculta o cae al suelo junto a Clawd.
-- **Ranuras.** `head`, `eyes`, `neck`. Las escenas que ya ocupan una declaran
-  `covers` (los audífonos `head`, las gafas `eyes`); mientras duran, manda el
-  objeto de la escena y el accesorio se esconde.
-- **Pintado.** En `hooks/desks.ts`, después del cuerpo, siguiendo `x + dx`;
-  acompaña el caminar y el balanceo sin código extra.
-- **Activación.** Por fecha (el gorro en diciembre) u opción de `userConfig`.
+- **La cabeza se lee del frame.** `headOf()` en `hooks/clawd.ts` devuelve `up`,
+  `sunk` (fila de arriba en medias celdas: respiración del cariño, tambaleo del
+  mareo) o `down` (patas en la fila de arriba: `FALLEN`). Ninguna pose lo
+  declara; las nuevas funcionan solas mientras sigan esos patrones.
+- **Escenas que tapan la cabeza.** `coversHead` en la escena (música, con su
+  salida, e idea por el foco): `View.head` queda sin definir y no se dibuja nada.
+- **El accesorio se dibuja una vez, en píxeles,** para la cabeza arriba:
+  `{ id, colors, pixels }`, dos píxeles por celda en cada sentido, columnas
+  desde el borde izquierdo de Clawd. `sunk` es el mismo dibujo un píxel más
+  abajo; `down`, el dibujo dado vuelta en el suelo, una celda a la derecha
+  de Clawd.
+- **Mezcla con el cuerpo.** Donde el accesorio cae sobre una celda del cuerpo
+  naranja, se mezclan sus píxeles; si cae sobre un glifo de la escena (un ojo,
+  el cigarro, la taza), la celda es de la escena. Una celda con más colores de
+  los que caben pierde sus píxeles más raros. `dress()` pone el resultado
+  debajo de las marcas de la escena, así que chispas y estrellas pasan encima.
+- **Activación.** `userConfig.hat`: `diciembre` (por defecto), `siempre` o
+  `nunca`; también con `/clawd-mood gorro <opción>`.
+- **Diseño.** El taller de píxeles (artifact) dibuja con las mismas reglas de
+  celda y exporta JSON; de su capa de accesorio salen los `pixels`.
 
-Primer accesorio: gorro de Navidad, rojo con borde y pompón blancos, siguiendo
-el estilo de `AGENTS.md`: pocos colores, silueta clara, bloques y cuartos de
-celda.
+El gorro: borde blanco y copa roja sobre la cabeza, la punta cayendo por la
+derecha hasta un pompón blanco junto a la cabeza.
+
+Siguientes ideas: más ranuras (`eyes`, `neck`) cuando haya un accesorio que
+las use, y el gorro en la escena de escritorios, donde hoy la fila de arriba
+la ocupa la línea de Clawd.
 
 ## Verificación pendiente
 
@@ -76,3 +86,5 @@ celda.
   no hay cortes ni saltos, y la convivencia con image-preview.
 - Se mantiene un salto ya existente: al terminar el turno Clawd festeja en su
   lugar a la izquierda (`home`), venga de donde venga.
+- Ver el gorro en una sesión real (`/clawd-mood gorro siempre`), incluida la
+  recarga del plugin al cambiar la opción.

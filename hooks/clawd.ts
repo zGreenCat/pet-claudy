@@ -162,7 +162,19 @@ export function walked(t: number, bodyColumns: number): number {
   return bounce(Math.floor(t / 2), Math.min(40, bodyColumns - WALK_WIDTH - 22))
 }
 
-export type View = { frame: Frame; marks: Mark[]; x: number; line: string; isWorking: boolean }
+// Where Clawd's head is, for what it wears on it: up, sunk half a cell, or
+// upside down on the ground. Undefined when the scene has something on it
+// already (the headphones, the bulb)
+export type Head = 'up' | 'sunk' | 'down'
+export type View = { frame: Frame; marks: Mark[]; x: number; line: string; isWorking: boolean; head?: Head }
+
+// The head of a pose, read off its frame, so no pose has to say: legs in the
+// top row mean it has fallen, a top row of raised halves means it has sunk
+export function headOf(frame: Frame): Head {
+  if (/[yz]/.test(frame[0])) return 'down'
+  if (frame[0].startsWith('.vvvvvv.')) return 'sunk'
+  return 'up'
+}
 
 // Tossing code in a pan: the food flies up and lands, sizzling in between
 function cooking(t: number): { frame: Frame; marks: Mark[] } {
@@ -471,6 +483,20 @@ export function view(
   readingFor?: number,
   runningFor?: number,
 ): View {
+  const v = bare(t, idleTicks, isWorking, bodyColumns, since, now, readingFor, runningFor)
+  return 'head' in v ? v : { ...v, head: headOf(v.frame) }
+}
+
+function bare(
+  t: number,
+  idleTicks: number,
+  isWorking: boolean,
+  bodyColumns: number,
+  since?: number,
+  now?: Moment,
+  readingFor?: number,
+  runningFor?: number,
+): View {
   if (since !== undefined && since >= 0 && since < CELEBRATE_TICKS) {
     return { ...celebrating(since), x: 0, isWorking: true }
   }
@@ -478,7 +504,7 @@ export function view(
     // It stops where it stood when the moment began, and walks on from there
     const x = isWorking ? walked(Math.max(0, t - now.since), bodyColumns) : 0
     const { dx = 0, ...scene } = moment(now)
-    return { ...scene, x: x + dx, isWorking }
+    return { ...scene, x: x + dx, isWorking, ...(now.mood === 'idea' ? { head: undefined } : {}) }
   }
   if (isWorking && readingFor !== undefined && readingFor >= 0) {
     // It stops where it stood to read, and walks on from there after
@@ -486,7 +512,7 @@ export function view(
   }
   if (isWorking && runningFor !== undefined && runningFor >= MUSIC_AFTER_TICKS) {
     const listened = runningFor - MUSIC_AFTER_TICKS
-    return { ...listening(listened), x: walked(Math.max(0, t - listened), bodyColumns), isWorking }
+    return { ...listening(listened), x: walked(Math.max(0, t - listened), bodyColumns), isWorking, head: undefined }
   }
   if (isWorking) {
     return { ...working(t), x: walked(t, bodyColumns), isWorking }
@@ -522,6 +548,8 @@ export type Scene = {
   // A short way out before the next scene: the book closes, the headphones
   // come off. Clawd stands where it stood meanwhile
   exit?: { ticks: number; play: (s: number) => Pose }
+  // Something already on its head, way out included: nothing else goes there
+  coversHead?: boolean
 }
 
 function momentScene(mood: Mood): Scene {
@@ -532,7 +560,8 @@ export const SCENES: Record<SceneId, Scene> = {
   celebrate: { place: 'home', length: CELEBRATE_TICKS, play: celebrating },
   cool: momentScene('cool'),
   love: momentScene('love'),
-  idea: momentScene('idea'),
+  // The bulb hangs where a hat would sit
+  idea: { ...momentScene('idea'), coversHead: true },
   magic: momentScene('magic'),
   super: momentScene('super'),
   dizzy: momentScene('dizzy'),
@@ -550,6 +579,7 @@ export const SCENES: Record<SceneId, Scene> = {
     place: 'stand',
     minTicks: 4,
     canLeave: s => s % 4 === 0,
+    coversHead: true,
     play: listening,
     // Both arms up to lift the headphones off its head
     exit: {

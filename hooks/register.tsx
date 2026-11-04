@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { AgentStatus, Register } from 'claude-code'
 
 import type { Tick } from '../types'
+import { HAT, dress, wearsHat } from './accessories'
 import {
   ERRORS_TO_DIZZY,
   READING_LINGER_TICKS,
@@ -63,11 +64,13 @@ export const register: Register = (on, options) => {
 
   const isBusy = () => isWorking || agents.some(a => a.doneAt === undefined)
   const context = (): Context => ({ idleTicks, isWorking: isBusy(), readingFor: readingFor(), runningFor: runningFor() })
+  // The hat, through December or as chosen in /config
+  const worn = () => (wearsHat(options.hat, new Date()) ? [HAT] : [])
   // What Clawd shows now. Stepping the director here, not only on the clock,
   // lets an event show at once when the scene it waits on can already end
   function shown() {
     director = step(director, context(), t)
-    return pose(director, context(), t, bodyColumns)
+    return dress(pose(director, context(), t, bodyColumns), worn())
   }
 
   function drawKey(): string {

@@ -15,6 +15,18 @@ test('/clawd-mood alone shows each slot, its choice and its variants', async $ =
   expect(result.text).toMatch(/break: rotar \(rotar, azar, cigarro, café\)/)
 })
 
+test('the hat is a choice like the others, December by default', async ($, on) => {
+  const writes: ConfigSetInput[] = []
+  on('config.set', (_$, e) => {
+    writes.push(e)
+    return { value: e.value }
+  })
+  expect(describe({})).toMatch(/gorro: diciembre \(diciembre, siempre, nunca\)/)
+  expect(describe({ hat: 'nunca' })).toMatch(/gorro: nunca/)
+  await $.command.run(run('gorro Siempre'))
+  expect(writes.map(w => [w.key, w.value])).toEqual([['clawd-buddy.hat', 'siempre']])
+})
+
 test('the listing reads the choice from the options the plugin loaded with', () => {
   expect(describe({ breakMood: 'cafe' })).toMatch(/break: café/)
   expect(describe({})).toMatch(/break: rotar/)

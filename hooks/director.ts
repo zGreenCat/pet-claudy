@@ -3,7 +3,7 @@
 // cleanly, a moment or the cheer plays to its end, and the events that come
 // meanwhile wait their turn. Pure: the clock steps it, the tests drive it.
 
-import { SCENES, want, walked } from './clawd.ts'
+import { SCENES, headOf, want, walked } from './clawd.ts'
 import type { Context, Mood, SceneId, View } from './clawd.ts'
 
 // What arrives from outside: a moment, or a turn that answered
@@ -99,5 +99,6 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number): V
   const { dx = 0, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(d.offset + t - d.from)
   const place = isExiting ? 'stand' : scene.place
   const x = place === 'home' ? 0 : walked(d.walkT, bodyColumns)
-  return { ...p, x: x + dx, isWorking: d.id === 'celebrate' || c.isWorking }
+  const head = scene.coversHead ? undefined : headOf(p.frame)
+  return { ...p, x: x + dx, isWorking: d.id === 'celebrate' || c.isWorking, head }
 }

@@ -26,6 +26,15 @@ const SLOTS: readonly Slot[] = [
       { id: 'cafe', label: 'café', aliases: ['café'] },
     ],
   },
+  {
+    field: 'hat',
+    name: 'gorro',
+    values: [
+      { id: 'diciembre', label: 'diciembre' },
+      { id: 'siempre', label: 'siempre' },
+      { id: 'nunca', label: 'nunca' },
+    ],
+  },
 ]
 
 const configKey = (slot: Slot) => `clawd-buddy.${slot.field}`

@@ -10,6 +10,10 @@ Clawd, the Claude Code mascot, above the prompt. It reacts to what Claude is doi
 - **celebra**: cheers with confetti when a turn ends.
 - **agentes**: each subagent walks out of Clawd with its own laptop, shows what it is doing in a bubble, and walks back in when it finishes.
 
+In December Clawd wears a Santa hat. It follows its head through every pose
+and falls off when Clawd does. Choose `diciembre`, `siempre` or `nunca` in
+`/config` or with `/clawd-mood gorro <choice>`.
+
 ## Clawd Invaders
 
 A small shooter for long tasks. `/clawd-play` opens a pane (docked beside the
@@ -41,6 +45,7 @@ node scripts/preview.ts ?        # list the moods
 node scripts/preview.ts cocina   # play one
 node scripts/preview.ts todos    # play them in turn
 node scripts/preview.ts cambios  # a made-up turn, scene after scene
+node scripts/preview.ts gorro    # the Santa hat over the poses that move the head
 ```
 
 ## Develop

@@ -6,6 +6,7 @@
 
 import { CELEBRATE_TICKS, MOMENT_TICKS, SLEEP_AFTER_TICKS, WIDTH, view } from '../hooks/clawd.ts'
 import type { Context, Frame, View } from '../hooks/clawd.ts'
+import { HAT, dress } from '../hooks/accessories.ts'
 import { cue, pose, start, step } from '../hooks/director.ts'
 import type { Cue } from '../hooks/director.ts'
 import { ROWS, START_X, scene, solo, walk } from '../hooks/desks.ts'
@@ -19,6 +20,18 @@ const HEIGHT = ROWS + 1
 const HOLD = 40
 
 type Mood = { name: string; about: string; at?: (t: number, columns: number) => View }
+
+// The hat over the poses that move the head: working, a deep breath with the
+// head sunk, a fall upside down, and the headphones, which take its place
+const HATTED_TICKS = 120
+function hatted(t: number, c: number): View {
+  const v =
+    t < 40 ? view(t, 0, true, c)
+    : t < 60 ? view(t, 0, true, c, undefined, { mood: 'love', since: t - 40 })
+    : t < 92 ? view(t, 0, false, c, undefined, { mood: 'dizzy', since: t - 60 })
+    : view(t, 0, true, c, undefined, undefined, undefined, t - 84)
+  return dress(v, [HAT])
+}
 
 // The director through a made-up turn: it works, reads a while, gets two
 // moments at once, waits on a long command, and the turn ends. Each scene
@@ -61,6 +74,7 @@ const MOODS: Mood[] = [
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: (t, c) => view(t, 0, true, c, undefined, undefined, undefined, 8 + t) },
   { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
   { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
+  { name: 'gorro', about: 'el gorro de Navidad: trabajando, con la cabeza hundida, caído y bajo los audífonos', at: (t, c) => hatted(t % HATTED_TICKS, c) },
   { name: 'agentes', about: 'con subagentes: cada uno llega con su notebook, teclea, y se va' },
 ]
 const POSES = MOODS.filter(m => m.at)
