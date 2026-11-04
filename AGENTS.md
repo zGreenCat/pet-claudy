@@ -82,5 +82,7 @@ Los cambios solo de documentación no requieren ejecutar las pruebas del plugin.
 ## Planes de trabajo
 
 Consultar `PLAN_GAME.md` antes de implementar Clawd Invaders, y `PLAN_MOODS.md`
-antes de cambiar cómo Clawd elige sus moods o de agregar uno nuevo. Son planes
-de trabajo, no una declaración de funcionalidades ya disponibles.
+antes de cambiar cómo Clawd elige sus moods o de agregar uno nuevo. Consultar
+`PLAN_SCENES.md` antes de agregar una escena o un accesorio: las escenas se
+declaran en `SCENES` y el director (`hooks/director.ts`) decide cuándo cambian.
+Son planes de trabajo, no una declaración de funcionalidades ya disponibles.
