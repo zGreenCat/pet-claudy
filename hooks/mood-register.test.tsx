@@ -23,6 +23,7 @@ test('the hat is a choice like the others, December by default', async ($, on) =
   })
   expect(describe({})).toMatch(/gorro: diciembre \(diciembre, siempre, nunca\)/)
   expect(describe({ hat: 'nunca' })).toMatch(/gorro: nunca/)
+  expect(describe({ tree: 'siempre' })).toMatch(/arbol: siempre \(diciembre, siempre, nunca\)/)
   await $.command.run(run('gorro Siempre'))
   expect(writes.map(w => [w.key, w.value])).toEqual([['clawd-buddy.hat', 'siempre']])
 })

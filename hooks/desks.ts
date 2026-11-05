@@ -170,7 +170,9 @@ export function walk(agents: Agent[], t: number, bodyColumns: number): Agent[] {
   return out
 }
 
-type Cell = { ch: string; style: Style }
+export type Cell = { ch: string; style: Style }
+// Something standing at the band's right edge, as cells: the Christmas tree
+export type Decor = readonly (readonly Cell[])[]
 
 const NONE: Style = {}
 const BLANK: Cell = { ch: ' ', style: NONE }
@@ -379,6 +381,27 @@ function fit(text: string, width: number): string {
   return out + '…'
 }
 
+// The columns left for Clawd and the desks once the decor takes its place at
+// the right edge, a cell apart
+export function usableColumns(bodyColumns: number, decor?: Decor): number {
+  return decor ? bodyColumns - (decor[0]?.length ?? 0) - 1 : bodyColumns
+}
+
+// The decor drawn last, at the right edge, over anything that ran into it
+function stand(rows: Cell[][], decor?: Decor) {
+  if (!decor) return
+  decor.forEach((cells, i) => {
+    const row = rows[i]
+    if (!row) return
+    const x0 = row.length - cells.length
+    cells.forEach((c, k) => {
+      if (x0 + k < 0) return
+      clear(row, x0 + k)
+      row[x0 + k] = c
+    })
+  })
+}
+
 // The drawing at tick `t`: ROWS rows of styled segments
 export function scene(
   t: number,
@@ -386,12 +409,14 @@ export function scene(
   clawd: [string, string, string],
   line: string,
   bodyColumns: number,
+  decor?: Decor,
 ): Segment[][] {
   const width = Math.max(DESKS_X + SLOT, bodyColumns)
+  const usable = usableColumns(width, decor)
   const rows: Cell[][] = Array.from({ length: ROWS }, () =>
     Array.from({ length: width }, () => ({ ch: ' ', style: NONE })),
   )
-  const { slot, shown, more } = seats(agents, bodyColumns)
+  const { slot, shown, more } = seats(agents, usable)
 
   if (more > 0) put(rows[3]!, DESKS_X + shown.length * slot, `+${more}`, { dim: true })
 
@@ -431,7 +456,7 @@ export function scene(
   let spokenTo = 0
   if (speaker) {
     const x = DESKS_X + speaker.x
-    const text = fit(speaker.activity, width - x)
+    const text = fit(speaker.activity, usable - x)
     put(rows[0]!, x, text, { fg: colorOf(speaker.type), bold: true })
     spokenTo = x + columns(text) + 1
   }
@@ -447,6 +472,7 @@ export function scene(
   // or out of it
   put(rows[0]!, 0, fit(line, DESKS_X - 1), { fg: 'claude', dim: true, italic: true })
   clawd.forEach((sprite, i) => paintCells(rows[i + 1]!, 0, sprite))
+  stand(rows, decor)
 
   return rows.map(segments)
 }
@@ -463,6 +489,7 @@ export function solo(
   line: string,
   isWorking: boolean,
   bodyColumns: number,
+  decor?: Decor,
 ): Segment[][] {
   const width = Math.max(1, bodyColumns)
   const rows: Cell[][] = Array.from({ length: ROWS }, () =>
@@ -472,5 +499,6 @@ export function solo(
   for (const m of marks) put(rows[m.row]!, x + m.x, m.text, { fg: m.fg, ...(m.bg ? { bg: m.bg } : {}) })
   const spriteWidth = Math.max(...frame.map(r => r.length))
   put(rows[2]!, x + spriteWidth + 1, line, { fg: 'claude', dim: !isWorking, italic: true })
+  stand(rows, decor)
   return rows.map(segments)
 }

@@ -10,7 +10,8 @@ import { HAT, dress } from '../hooks/accessories.ts'
 import { cue, pose, start, step } from '../hooks/director.ts'
 import type { Cue } from '../hooks/director.ts'
 import { ROWS, START_X, scene, solo, walk } from '../hooks/desks.ts'
-import type { Agent, Segment } from '../hooks/desks.ts'
+import type { Agent, Decor, Segment } from '../hooks/desks.ts'
+import { TREE_W, treeCells } from '../hooks/tree.ts'
 
 const TICK_MS = 250
 const CLAUDE = '#D77757'
@@ -19,7 +20,22 @@ const HEIGHT = ROWS + 1
 // How long `todos` holds each mood, in ticks
 const HOLD = 40
 
-type Mood = { name: string; about: string; at?: (t: number, columns: number) => View }
+type Mood = {
+  name: string
+  about: string
+  at?: (t: number, columns: number) => View
+  // What stands at the band's right edge meanwhile
+  decor?: (t: number) => Decor
+}
+
+// December in a few seconds: a day every two, the lights coming on a turn at
+// a time, Clawd at work with its hat on beside the tree
+const DAY_TICKS = 8
+const XMAS_TICKS = 25 * DAY_TICKS
+function christmasTree(t: number): Decor {
+  const k = t % XMAS_TICKS
+  return treeCells(1 + Math.floor(k / DAY_TICKS), Math.floor(k / (DAY_TICKS * 3)), true, t)
+}
 
 // The hat over the poses that move the head: working, a deep breath with the
 // head sunk, a fall upside down, and the headphones, which take its place
@@ -74,6 +90,12 @@ const MOODS: Mood[] = [
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: (t, c) => view(t, 0, true, c, undefined, undefined, undefined, 8 + t) },
   { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
   { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
+  {
+    name: 'navidad',
+    about: 'diciembre: el árbol se arma día a día y se enciende con los turnos',
+    at: (t, c) => dress(view(t, 0, true, c - TREE_W - 1), [HAT]),
+    decor: christmasTree,
+  },
   { name: 'gorro', about: 'el gorro de Navidad: trabajando, con la cabeza hundida, caído y bajo los audífonos', at: (t, c) => hatted(t % HATTED_TICKS, c) },
   { name: 'agentes', about: 'con subagentes: cada uno llega con su notebook, teclea, y se va' },
 ]
@@ -141,8 +163,9 @@ const timer = setInterval(() => {
   const mood = arg === 'todos' ? POSES[Math.floor(t / HOLD) % POSES.length]! : MOODS.find(m => m.name === arg)!
 
   if (mood.at) {
-    const v = mood.at(arg === 'todos' ? t % HOLD : t, columns())
-    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns()))
+    const k = arg === 'todos' ? t % HOLD : t
+    const v = mood.at(k, columns())
+    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns(), mood.decor?.(k)))
     t += 1
     return
   }

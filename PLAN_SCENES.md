@@ -80,7 +80,16 @@ Siguientes ideas: más ranuras (`eyes`, `neck`) cuando haya un accesorio que
 las use, y el gorro en la escena de escritorios, donde hoy la fila de arriba
 la ocupa la línea de Clawd.
 
-## Temporada navideña (propuesto)
+## Temporada navideña
+
+Estado: etapa 1 hecha en 0.16.0 (el árbol por fecha, en `hooks/tree.ts`, con
+el contador de luces de la sesión ya incluido). Pendiente: la chispa del
+festejo (etapa 2) y los gorritos de los subagentes (etapa 3).
+
+El pino lo dibujó la persona en el editor: dos verdes (borde y sombra), tronco,
+4 celdas llenas para adornos, y la punta que se vuelve estrella el 24 (la
+estrella comparte celda con la punta, así que la reemplaza). Mide 8×4 celdas y
+aparece desde 70 columnas.
 
 Profundiza el gorro: un árbol que se arma durante diciembre y se enciende con
 el trabajo de la sesión, y gorritos para los subagentes.

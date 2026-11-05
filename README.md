@@ -14,6 +14,12 @@ In December Clawd wears a Santa hat. It follows its head through every pose
 and falls off when Clawd does. Choose `diciembre`, `siempre` or `nunca` in
 `/config` or with `/clawd-mood gorro <choice>`.
 
+A pine stands at the band's right edge in December, when the band is 70
+columns or wider. It gets an ornament every few days, its point lights as a
+star on the 24th and presents show up on the 25th; each turn that ends lights
+one more ornament for the session, and the lit ones twinkle while Claude
+works. Choose it like the hat: `/clawd-mood arbol <choice>`.
+
 ## Clawd Invaders
 
 A small shooter for long tasks. `/clawd-play` opens a pane (docked beside the
@@ -46,6 +52,7 @@ node scripts/preview.ts cocina   # play one
 node scripts/preview.ts todos    # play them in turn
 node scripts/preview.ts cambios  # a made-up turn, scene after scene
 node scripts/preview.ts gorro    # the Santa hat over the poses that move the head
+node scripts/preview.ts navidad  # December in seconds: the tree filling in and lighting up
 ```
 
 ## Pixel editor

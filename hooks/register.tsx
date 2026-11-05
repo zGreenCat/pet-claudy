@@ -17,11 +17,12 @@ import {
   viewKey,
 } from './clawd'
 import type { Context, Frame } from './clawd'
-import { START_X, describe, oneLine, scene, solo, summary, walk } from './desks'
+import { START_X, describe, oneLine, scene, solo, summary, usableColumns, walk } from './desks'
 import { cue, pose, reset, start, step } from './director'
-import type { Agent, Segment } from './desks'
+import type { Agent, Decor, Segment } from './desks'
 import { registerGame, registerGameCommand, trackPrompt, trackTurn } from './game-register'
 import { registerMoodCommand, registerMoods } from './mood-register'
+import { TREE_MIN_COLUMNS, treeCells, treeDay } from './tree'
 
 // The view key last drawn. The timer only writes it when what Clawd shows
 // changes, so a still Clawd costs no redraws.
@@ -66,27 +67,36 @@ export const register: Register = (on, options) => {
   const context = (): Context => ({ idleTicks, isWorking: isBusy(), readingFor: readingFor(), runningFor: runningFor() })
   // The hat, through December or as chosen in /config
   const worn = () => (wearsHat(options.hat, new Date()) ? [HAT] : [])
+  // The tree's lights this session: one more for each turn that answered
+  let lit = 0
+  // The tree at the band's right edge, through December or as chosen in
+  // /config, when the band has room for it
+  function decor(): Decor | undefined {
+    const day = treeDay(options.tree, new Date())
+    if (day === undefined || bodyColumns < TREE_MIN_COLUMNS) return undefined
+    return treeCells(day, lit, isBusy(), t)
+  }
   // What Clawd shows now. Stepping the director here, not only on the clock,
   // lets an event show at once when the scene it waits on can already end
   function shown() {
     director = step(director, context(), t)
-    return dress(pose(director, context(), t, bodyColumns), worn())
+    return dress(pose(director, context(), t, usableColumns(bodyColumns, decor())), worn())
   }
 
   function drawKey(): string {
-    if (agents.length === 0) return viewKey(shown())
+    if (agents.length === 0) return `${viewKey(shown())}#${JSON.stringify(decor() ?? null)}`
     return `T${JSON.stringify(desksScene())}`
   }
 
   function soloScene(): Segment[][] {
     const v = shown()
-    return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns)
+    return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns, decor())
   }
 
   function desksScene() {
     // Clawd alone, not what it holds: the desks start right beside it
     const frame = shown().frame.map(r => r.slice(0, WIDTH)) as Frame
-    return scene(t, agents, frame, isWorking ? 'dirigiendo' : 'esperando', bodyColumns)
+    return scene(t, agents, frame, isWorking ? 'dirigiendo' : 'esperando', bodyColumns, decor())
   }
 
   function seat(id: string, type: string, task: string) {
@@ -107,7 +117,7 @@ export const register: Register = (on, options) => {
         t += 1
         idleTicks = isBusy() ? 0 : idleTicks + 1
         if (readingFrom !== undefined && t - (reads[reads.length - 1] ?? t) > READING_LINGER_TICKS) readingFrom = undefined
-        agents = walk(agents, t, bodyColumns)
+        agents = walk(agents, t, usableColumns(bodyColumns, decor()))
 
         // An agent whose loop ended without a SubagentStop still leaves its desk
         const waiting = agents.filter(a => a.doneAt === undefined && t - a.bornAt >= RECONCILE_TICKS)
@@ -217,6 +227,7 @@ export const register: Register = (on, options) => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined && e.reason === 'answer') {
       director = cue(director, 'celebrate', t)
+      lit += 1
       isWorking = false
       idleTicks = 0
       reads = []
