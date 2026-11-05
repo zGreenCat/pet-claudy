@@ -80,6 +80,68 @@ Siguientes ideas: más ranuras (`eyes`, `neck`) cuando haya un accesorio que
 las use, y el gorro en la escena de escritorios, donde hoy la fila de arriba
 la ocupa la línea de Clawd.
 
+## Temporada navideña (propuesto)
+
+Profundiza el gorro: un árbol que se arma durante diciembre y se enciende con
+el trabajo de la sesión, y gorritos para los subagentes.
+
+### El árbol
+
+- **Dónde.** Pegado al borde derecho de la banda: 4 filas, unas 6 celdas de
+  ancho (estrella, follaje en medias celdas, tronco, regalos). Es decorado de
+  la banda, no de Clawd: no camina ni sigue sus poses. Solo aparece si la banda
+  tiene ancho de sobra (orientativo: 70 columnas); si no, no se dibuja.
+- **Convivencia.** Clawd camina y escribe su línea en el ancho que deja el
+  árbol (`walked` y `solo` reciben el ancho útil), y los escritorios se sientan
+  en ese mismo ancho (`seats`): con el árbol cabe un escritorio menos.
+- **Se arma por fecha (adviento).** El 1 de diciembre está pelado; cada día
+  suma un adorno en un orden fijo de posiciones; el 24 se prende la estrella;
+  desde el 25, regalos al pie. Sale de la fecha: no guarda nada.
+  Con `siempre` fuera de diciembre se ve completo, como el 25.
+- **Se enciende con el trabajo de la sesión.** Cada turno que termina con
+  respuesta prende una luz más, hasta llenarlas; mientras Claude trabaja, las
+  luces encendidas parpadean. Al terminar el turno, una chispa viaja de Clawd
+  al árbol durante el festejo, y la luz nueva se prende al llegar. Este
+  progreso vive en memoria y empieza de cero en cada sesión o recarga: guardarlo
+  en `userConfig` recargaría el plugin en cada turno.
+- **Activación.** Campo `userConfig.tree` (`diciembre` por defecto, `siempre`,
+  `nunca`) y `/clawd-mood arbol <opción>`, igual que el gorro.
+
+### Gorritos de los subagentes
+
+- Siguen la opción del gorro de Clawd (`userConfig.hat`).
+- El gorrito ocupa la celda sobre la cabeza del subagente, la de los símbolos
+  de código (`=>`, `{}`). Mientras lo lleva, los símbolos no se dibujan, y el
+  `✓` de terminado pasa al costado del notebook.
+- Dibujo pequeño en píxeles como el del gorro grande: borde blanco, copa roja,
+  pompón; sigue al subagente al caminar.
+
+### Arquitectura
+
+| Archivo | Cambio |
+| --- | --- |
+| `hooks/tree.ts` (nuevo) | Puro: celdas del árbol según día del mes, luces encendidas y tick; posición de la chispa. |
+| `hooks/desks.ts` | `solo` y `scene` reciben el decorado de la banda y el ancho útil; gorrito y `✓` desplazado en los escritorios. |
+| `hooks/accessories.ts` | El gorrito de los subagentes, en el mismo formato de píxeles. |
+| `hooks/register.tsx` | Cuenta las luces de la sesión, arma el decorado y pasa el ancho útil. |
+| `hooks/clawd.ts` | `walked` sobre el ancho útil. |
+| `hooks/mood-register.tsx`, `plugin.json` | Campo `tree` y su espacio `arbol`. |
+| `scripts/preview.ts` | Modo `navidad`: el árbol día a día y una sesión prendiendo luces. |
+
+### Etapas
+
+1. **Árbol por fecha.** Sprite, adviento, campo `tree`, espacio para Clawd y
+   escritorios. Vista previa del dibujo antes de integrarlo (render o JSON para
+   el editor).
+2. **Luces por trabajo.** Contador de la sesión, parpadeo mientras trabaja y la
+   chispa en el festejo.
+3. **Gorritos de los subagentes.** Dibujo, reemplazo de los símbolos y `✓`
+   desplazado.
+4. **Verificación.** Pruebas de cada regla (día 1, 12, 24 y 25; luces que no
+   pasan del máximo; sin árbol en una banda angosta; `nunca`); `claude plugin
+   test .`, `validate`, `git diff --check`; sesión real con subagentes e
+   image-preview. Subir la versión según `AGENTS.md`.
+
 ## Verificación pendiente
 
 - Sesión real: trabajar con lecturas, comandos largos, tests y commits; ver que

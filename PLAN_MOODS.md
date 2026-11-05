@@ -111,8 +111,8 @@ desde `/config` y que `/clawd-mood` muestre el estado y cómo cambiarlo.
 Confirmado en la declaración de la API (`Register`): las opciones quedan fijas
 durante una activación, y cambiar una **recarga el plugin**: `register` corre
 otra vez con las nuevas. Elegir una variante reinicia el estado del módulo
-(el reloj de Clawd, los agentes vistos) y probablemente el juego abierto, cuyo
-estado vive en su `Client`.
+(el reloj de Clawd, los agentes vistos), pero no el juego abierto: en la
+sesión real la partida siguió su curso al cambiar el break.
 
 Prototipo (v0.14.0): campo `userConfig.breakMood` (`rotar`, `azar`, `cigarro`,
 `cafe`; por defecto `rotar`), aún sin efecto en lo que dibuja Clawd, y
@@ -120,16 +120,16 @@ Prototipo (v0.14.0): campo `userConfig.breakMood` (`rotar`, `azar`, `cigarro`,
 motor con un `config.set` simulado: escribe `clawd-buddy.breakMood`, muestra
 un `deny` y rechaza espacios y variantes inválidos sin escribir.
 
-Pendiente de comprobar a mano en una sesión real:
+Comprobación en una sesión real:
 
 | Pregunta | Resultado |
 | --- | --- |
-| `$.config.set` del plugin sobre su propio campo escribe, o responde `deny` | pendiente |
-| Tras escribir, el plugin se recarga y `/clawd-mood` muestra el valor nuevo | pendiente |
+| `$.config.set` del plugin sobre su propio campo escribe, o responde `deny` | escribe: `/clawd-mood break café` respondió sin `deny` |
+| Tras escribir, el plugin se recarga y `/clawd-mood` muestra el valor nuevo | sí: el siguiente `/clawd-mood` mostró `café` |
 | El valor sobrevive a cerrar y abrir la sesión | pendiente |
 | `/config` muestra el selector, con título y descripción en español | pendiente |
 | `/clawd-mood` corre durante un turno activo | pendiente |
-| Qué le pasa a una partida abierta de Clawd Invaders al recargar | pendiente |
+| Qué le pasa a una partida abierta de Clawd Invaders al recargar | sigue su curso normal: la recarga no la cierra ni la reinicia |
 
 ## Arquitectura propuesta
 
