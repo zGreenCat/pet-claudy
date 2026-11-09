@@ -138,19 +138,21 @@ test('reading begins at the end of a step, and the book is put away after', () =
   expect(shown[3]!.line).toMatch(/^pensando/)
   expect(shown[4]!.line).toBe('leyendo…')
   const end = lastRead + READING_LINGER_TICKS + 1
-  // A page turned, the book away, then back to work
-  expect(shown[end]!.frame[1]).toContain('6')
-  expect(shown[end + 1]!.frame[1]).not.toMatch(/[1-6]/)
+  // The book away with a half turn and a tick front-on, then back to work
+  expect(shown[end]!.quarters).toEqual(HALF_TURN)
+  expect(shown[end + 1]!.quarters).toBeUndefined()
   expect(shown[end + 2]!.line).toMatch(/^pensando/)
 })
 
-test('the headphones come off with both arms before Clawd walks on', () => {
+test('after the music Clawd half turns, faces front, and walks on', () => {
   const ctx = (t: number): Context => ({ ...WORKING, runningFor: t <= 40 ? t : undefined })
   const { shown } = play(start(0), 0, 60, ctx)
   expect(shown[12]!.line).toBe('musiquita…')
-  // The command ends at 41; the beat ends at 44, the arms go up, then back to work
-  const off = shown.findIndex((v, t) => t > 40 && v?.marks.some(m => m.text.startsWith('╭')) && v.frame[0].startsWith('v'))
+  // The command ends at 41: on the next beat the headphones come off with a
+  // half turn and a tick front-on, then back to work
+  const off = first(shown, 41, v => v.line === 'musiquita…' && (v.quarters === HALF_TURN || v.quarters?.join() === mirrored(HALF_TURN).join()))
   expect(off).toBeGreaterThan(40)
+  expect(shown[off + 1]!.quarters).toBeUndefined()
   expect(shown[off + 2]!.line).toMatch(/^(pensando|trabajando)/)
 })
 

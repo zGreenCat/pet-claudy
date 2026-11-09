@@ -176,6 +176,28 @@ sombra.
 - `view()` sin director sigue mostrando el baile como antes, para las pruebas
   de poses y `scripts/preview.ts`; `preview.ts caminata` muestra la escena nueva.
 
+## Lote 1 de moods en tres cuartos (hecho en 0.19.0)
+
+Dibujados y retocados en el taller de píxeles; los fotogramas viven en
+`hooks/poses.ts` tal como el taller los exporta (24×8 píxeles, Clawd de frente
+cuatro píxeles adentro, `POSE_DX` en `desks.ts`).
+
+| Escena | Dibujos | Cede |
+| --- | --- | --- |
+| quieto | respira, parpadea, cada tanto medio giro y mira al lado | cuando sea |
+| leer | tres cuartos, libro abajo adelante, la página pasando | como antes; sale con medio giro y de frente |
+| música | "música 3": cabeceo con los ojos, patas alternadas, mano, notas en píxeles | en cada tiempo; sale con medio giro y de frente |
+| café | taza adelante, vapor, sorbo | nunca a mitad del sorbo (`busy`) |
+| cigarro | brasa, humo, pitada y exhalación | nunca a mitad de la pitada ni de la exhalación |
+
+- La caminata y el medio giro también pasaron a `poses.ts`.
+- Detenido donde caminó, Clawd mira hacia donde venía: el director espeja las
+  escenas `stand` si llegó caminando a la izquierda. Las de su lugar (`home`)
+  miran a la derecha.
+- Estas escenas no llevan gorro todavía (pendiente junto con el gorro de
+  perfil). `view()` sin director sigue con las poses viejas; `preview.ts`
+  muestra las nuevas en `quieto`, `lee`, `música`, `café` y `fuma`.
+
 ## Ideas anotadas
 
 - **Un entremedio para cambiar de lugar.** Las escenas que van en un sitio

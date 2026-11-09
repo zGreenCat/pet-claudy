@@ -4,8 +4,8 @@
 //   node scripts/preview.ts todos    plays them in turn
 // Ctrl+C stops it. Not part of the mod: the engine loads only hooks/.
 
-import { CELEBRATE_TICKS, MOMENT_TICKS, SLEEP_AFTER_TICKS, WIDTH, view } from '../hooks/clawd.ts'
-import type { Context, Frame, View } from '../hooks/clawd.ts'
+import { CELEBRATE_TICKS, MOMENT_TICKS, SCENES, SLEEP_AFTER_TICKS, WIDTH, view } from '../hooks/clawd.ts'
+import type { Context, Frame, SceneId, View } from '../hooks/clawd.ts'
 import { HAT, dress } from '../hooks/accessories.ts'
 import { cue, pose, start, step } from '../hooks/director.ts'
 import type { Cue } from '../hooks/director.ts'
@@ -19,6 +19,14 @@ const CLAUDE = '#D77757'
 const HEIGHT = ROWS + 1
 // How long `todos` holds each mood, in ticks
 const HOLD = 40
+
+// A scene as the plugin plays it, standing at its spot
+function scened(id: SceneId) {
+  return (t: number): View => {
+    const { dx = 0, walking: _w, turning: _t, ...p } = SCENES[id].play(t)
+    return { ...p, x: dx, isWorking: false }
+  }
+}
 
 type Mood = {
   name: string
@@ -84,20 +92,20 @@ function directed(t: number, columns: number): View {
 // session has been idle, and whether a turn is running. `agentes` is not a
 // pose: it is the desks scene, with its own script below.
 const MOODS: Mood[] = [
-  { name: 'quieto', about: 'esperando: parpadea y se balancea', at: (t, c) => view(t, 0, false, c) },
+  { name: 'quieto', about: 'esperando: parpadea y se balancea', at: scened('idle') },
   { name: 'baila', about: 'trabajando: baila y camina ("pensando", "trabajando", "bailando")', at: (t, c) => view(t % 72, 0, true, c) },
   { name: 'cocina', about: 'trabajando, "cocinando código": tira código al aire en una sartén', at: (t, c) => view(72 + (t % 24), 0, true, c) },
   { name: 'celebra', about: 'terminó un turno: salta con los brazos arriba, confeti y "¡listo!"', at: (t, c) => view(t, 0, false, c, t % CELEBRATE_TICKS) },
-  { name: 'fuma', about: 'un rato sin usarlo: un break con cigarro, de vez en cuando', at: (t, c) => view(t, 210, false, c) },
+  { name: 'fuma', about: 'un rato sin usarlo: un break con cigarro, de vez en cuando', at: scened('smoke') },
   { name: 'duerme', about: '3 minutos sin usarlo: zzz, sin animación', at: (t, c) => view(t, SLEEP_AFTER_TICKS, false, c) },
   { name: 'cool', about: 'pasan los tests o sale un commit: lentes de sol', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'cool', since: t % MOMENT_TICKS.cool }) },
   { name: 'cariño', about: 'le dices gracias: un corazón sobre su mano', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'love', since: t % MOMENT_TICKS.love }) },
   { name: 'idea', about: 'termina un plan: se le prende el foco', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'idea', since: t % MOMENT_TICKS.idea }) },
   { name: 'magia', about: 'usa una skill: agita la varita y saltan chispas', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'magic', since: t % MOMENT_TICKS.magic }) },
-  { name: 'lee', about: 'lee varios archivos seguidos: un libro en la mano', at: (t, c) => view(t, 0, true, c, undefined, undefined, t) },
+  { name: 'lee', about: 'lee varios archivos seguidos: un libro en la mano', at: scened('read') },
   { name: 'súper', about: 'lanza varios subagentes a la vez: capa y puño arriba', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'super', since: t % MOMENT_TICKS.super }) },
-  { name: 'café', about: 'un rato sin usarlo, otro break: una taza de café', at: (t, c) => view(t, 450, false, c) },
-  { name: 'música', about: 'espera un comando largo: audífonos y notas', at: (t, c) => view(t, 0, true, c, undefined, undefined, undefined, 8 + t) },
+  { name: 'café', about: 'un rato sin usarlo, otro break: una taza de café', at: scened('coffee') },
+  { name: 'música', about: 'espera un comando largo: audífonos y notas', at: scened('music') },
   { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
   { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
   { name: 'caminata', about: 'trabajando: camina de tres cuartos, gira, se detiene a bailar o cocinar (8 cuadros por segundo)', at: walking },

@@ -50,8 +50,26 @@ const PALETTE = ['#6A9BCC', '#8DB360', '#C77DBB', '#D4A23C', '#5FB3A9', '#E07A5F
 const MARKS = ['=>', '++', '{}', '</>', '()', '&&', ';;', '#!']
 const MARK_COLORS = ['#E58FD0', '#F2C14E', '#7FD1E8']
 
-// Pixel colors: O Clawd, D the shade of its body, K eye, G laptop; . nothing
-const PIXEL: Record<string, string> = { O: 'claude', D: '#A0533A', K: EYE_COLOR, G: '#6B7280' }
+// Pixel colors: O Clawd, D the shade of its body, K eye, G laptop, and what
+// the workshop's poses hold (see poses.ts); . nothing
+const PIXEL: Record<string, string> = {
+  O: 'claude',
+  D: '#A0533A',
+  K: EYE_COLOR,
+  G: '#6B7280',
+  N: BOOK_COLOR,
+  P: PAGE_COLOR,
+  W: '#F2F2F2',
+  B: PHONES_COLOR,
+  U: MUG_COLOR,
+  M: COFFEE_COLOR,
+  E: '#C2410C',
+  Y: '#F2C14E',
+  S: '#B8BCC4',
+  R: '#D93A3A',
+}
+// The workshop's poses start this many cells left of Clawd's front-on body
+const POSE_DX = -2
 
 // Sprites are four pixel rows of two pixels a cell, drawn in quarter blocks
 // as fine as the big Clawd: a small one with an eye in each upper corner,
@@ -490,14 +508,15 @@ export function solo(
   isWorking: boolean,
   bodyColumns: number,
   decor?: Decor,
-  // The pose in pixels, two to a cell each way, drawn in place of the frame
+  // The pose in pixels, two to a cell each way over the band's rows, drawn in
+  // place of the frame
   quarters?: readonly string[],
 ): Segment[][] {
   const width = Math.max(1, bodyColumns)
   const rows: Cell[][] = Array.from({ length: ROWS }, () =>
     Array.from({ length: width }, () => ({ ch: ' ', style: NONE })),
   )
-  if (quarters) paintQuarters(rows, 1, x, [...quarters])
+  if (quarters) paintQuarters(rows, 0, x + POSE_DX, [...quarters])
   else frame.forEach((sprite, i) => paintCells(rows[i + 1]!, x, sprite))
   for (const m of marks) put(rows[m.row]!, x + m.x, m.text, { fg: m.fg, ...(m.bg ? { bg: m.bg } : {}) })
   const spriteWidth = Math.max(...frame.map(r => r.length))

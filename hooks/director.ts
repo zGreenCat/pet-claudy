@@ -117,6 +117,9 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
     drawn = half === 0 ? facing(HALF_TURN, came || goes) : undefined
   } else if (turning === 'out') {
     drawn = half === 0 ? undefined : facing(HALF_TURN, goes || came)
+  } else if (quarters && place !== 'home' && came < 0) {
+    // Stopped where it walked to, it keeps facing the way it came
+    drawn = mirrored(quarters)
   }
   // Nothing worn over a pose drawn in pixels: what it wears follows the cells
   const head = scene.coversHead || drawn ? undefined : headOf(p.frame)

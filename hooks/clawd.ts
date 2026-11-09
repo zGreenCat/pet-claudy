@@ -3,6 +3,8 @@
 // changed and the tests can drive it.
 
 import type { Mark } from './desks'
+import { COFFEE, HALF_TURN, IDLE as WAITING, MUSIC, READ, SMOKE, WALK, shotAt } from './poses.ts'
+import type { Shot } from './poses.ts'
 
 export const TICK_MS = 250
 export const WIDTH = 8
@@ -126,55 +128,9 @@ const DANCE: Frame[] = [
 const IDLE: Frame = [HEAD, BODY, LEGS]
 const BLINK: Frame = [HEAD_BLINK, BODY, LEGS]
 
-// Walking three-quarters on, in pixels two to a cell each way over Clawd's
-// three rows: O its body, D the body's shade, K an eye. The shaded side is
-// behind, the face ahead with both eyes, and the legs step in two groups,
-// each with a shaded far leg. Drawn facing right; going left it is mirrored
-export const WALK_STEPS: readonly string[][] = [
-  [
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOKOOOOOKO..',
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOOOOOOOOO..',
-    '.D.O.O.OD.O.O...',
-    '................',
-  ],
-  [
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOKOOOOOKO..',
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOOOOOOOOO..',
-    '.DO.O.O..DO.O...',
-    '................',
-  ],
-  [
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOKOOOOOKO..',
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOOOOOOOOO..',
-    '..D.O.O..D.O.O..',
-    '................',
-  ],
-  [
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOKOOOOOKO..',
-    '.DDDOOOOOOOOOO..',
-    '.DDDOOOOOOOOOO..',
-    '.D.O.D.OD..O.O..',
-    '................',
-  ],
-]
-
-// Half turned between three-quarters and front-on: one column of shaded
-// side, the eyes halfway over, the far arm out. Facing right, like the steps
-export const HALF_TURN: readonly string[] = [
-  '.DOOOOOOOOOOOO..',
-  '.DOOOKOOOOOKOO..',
-  '.DOOOOOOOOOOOOO.',
-  '.DOOOOOOOOOOOO..',
-  '.D.O.O.....O.O..',
-  '................',
-]
+// Walking three-quarters on and half turned, as drawn in the workshop
+export const WALK_STEPS: readonly (readonly string[])[] = WALK.map(shot => shot.px)
+export { HALF_TURN }
 
 export const mirrored = (pixels: readonly string[]): string[] => pixels.map(row => [...row].reverse().join(''))
 const COOK: Frame = [HEAD, BODY_PAN, LEGS]
@@ -662,6 +618,20 @@ export type Scene = {
   coversHead?: boolean
 }
 
+// A scene drawn in the workshop: its shots in a loop, over the front-on frame
+// that stands in for it where only cells will do (the desks)
+function drawn(shots: readonly Shot[], line: string) {
+  return (s: number): Pose => ({ frame: IDLE, marks: [], line, quarters: shotAt(shots, s).px })
+}
+
+// A way out half turned, then front-on: what it held is put away
+function putAway(line: string): Scene['exit'] {
+  return {
+    ticks: 2,
+    play: s => (s === 0 ? { frame: IDLE, marks: [], line, quarters: HALF_TURN } : { frame: IDLE, marks: [], line }),
+  }
+}
+
 function momentScene(mood: Mood): Scene {
   return { place: 'stand', length: MOMENT_TICKS[mood], play: s => moment({ mood, since: s }) }
 }
@@ -676,30 +646,15 @@ export const SCENES: Record<SceneId, Scene> = {
   magic: momentScene('magic'),
   super: momentScene('super'),
   dizzy: momentScene('dizzy'),
-  read: {
-    place: 'stand',
-    minTicks: 4,
-    play: reading,
-    // A last page turned, then the book is put away
-    exit: {
-      ticks: 2,
-      play: s => ({ frame: s === 0 ? [HEAD, BODY_BOOK_TURN, LEGS_BOOK] : IDLE, marks: [], line: 'leyendo…' }),
-    },
-  },
+  read: { place: 'stand', minTicks: 4, play: drawn(READ, 'leyendo…'), exit: putAway('leyendo…') },
   music: {
     place: 'stand',
     minTicks: 4,
-    canLeave: s => s % 4 === 0,
+    // On a beat: every shot of the groove is one
+    canLeave: s => s % 2 === 0,
     coversHead: true,
-    play: listening,
-    // Both arms up to lift the headphones off its head
-    exit: {
-      ticks: 2,
-      play: s =>
-        s === 0
-          ? { frame: [HEAD_ARMS_UP, BODY_ARMS_UP, LEGS], marks: [{ row: 0, x: 0, text: '╭──────╮', fg: PHONES }], line: 'musiquita…' }
-          : { frame: IDLE, marks: [], line: 'musiquita…' },
-    },
+    play: drawn(MUSIC, 'musiquita…'),
+    exit: putAway('musiquita…'),
   },
   work: {
     place: 'walk',
@@ -716,9 +671,10 @@ export const SCENES: Record<SceneId, Scene> = {
     play: working,
   },
   sleep: { place: 'home', play: () => ({ frame: BLINK, marks: [], line: 'zzz' }) },
-  smoke: { place: 'home', minTicks: 4, canLeave: s => s % 8 >= 2, play: s => ({ ...smoking(s), line: 'en mi break' }) },
-  coffee: { place: 'home', minTicks: 4, canLeave: s => s % 16 >= 3, play: s => ({ ...coffee(s), line: 'un cafecito' }) },
-  idle: { place: 'home', play: idling },
+  // Not mid-puff nor mid-sip
+  smoke: { place: 'home', minTicks: 4, canLeave: s => !shotAt(SMOKE, s).busy, play: drawn(SMOKE, 'en mi break') },
+  coffee: { place: 'home', minTicks: 4, canLeave: s => !shotAt(COFFEE, s).busy, play: drawn(COFFEE, 'un cafecito') },
+  idle: { place: 'home', play: s => ({ ...drawn(WAITING, idling(s).line)(s) }) },
 }
 
 // What Clawd is up to, as the director sees it
