@@ -151,11 +151,49 @@ el trabajo de la sesión, y gorritos para los subagentes.
    test .`, `validate`, `git diff --check`; sesión real con subagentes e
    image-preview. Subir la versión según `AGENTS.md`.
 
+## Caminata de tres cuartos (hecho en 0.17.0)
+
+Dibujada por la persona en el taller de píxeles (artifact "Clawd de perfil"):
+cuatro pasos de tres cuartos, la cara lateral en sombra (`D`, `#A0533A`) y la
+frontal con los dos ojos, las patas en dos grupos con una pata de fondo en
+sombra.
+
+- La escena `work` va por rondas (`round` en `hooks/clawd.ts`): camina
+  `WALK_TICKS`, gira de frente un tick, se detiene `STOP_TICKS` a bailar o
+  cocinar como antes y vuelve a girar. El baile y la sartén llevan su propia
+  cuenta entre rondas, así que sus líneas siguen rotando.
+- El reloj corre a medio tick (125 ms). Todo lo demás avanza en ticks enteros
+  como antes; solo los pasos cambian cada medio tick (8 por segundo). Camina
+  una celda por tick (`strolled`).
+- El director espeja los pasos al ir a la izquierda y muestra a Clawd de frente
+  en el tick en que se da vuelta en un borde.
+- Las poses en píxeles van en `View.quarters`; `solo` las pinta con
+  `paintQuarters`. El frame de frente queda como respaldo para los
+  escritorios. Mientras camina no lleva gorro (pendiente: calzarlo en tres
+  cuartos).
+- `view()` sin director sigue mostrando el baile como antes, para las pruebas
+  de poses y `scripts/preview.ts`; `preview.ts caminata` muestra la escena nueva.
+
+## Ideas anotadas
+
+- **Un entremedio para cambiar de lugar.** Las escenas que van en un sitio
+  fijo (`home`: quieto, breaks, dormir) hoy aparecen allí de golpe, venga
+  Clawd de donde venga. Propuesta de la persona: una animación corta en la que
+  Clawd salta hacia abajo, sale de la banda y aparece en el lugar que la escena
+  necesita. Serviría a varias escenas a la vez, como una salida (`exit`) y una
+  entrada comunes que el director juega al cambiar de `place`.
+- **Un gorro que se mueve con Clawd.** Hoy el gorro es un dibujo fijo sobre la
+  cabeza: no rebota con los pasos ni con el baile, y se ve pegado. Idea: que
+  la punta y el pompón tengan dos o tres posiciones y sigan el movimiento con
+  un tick de retraso (se balancean al caminar, saltan un poco después que el
+  cuerpo en el festejo). Vale para cualquier accesorio con partes colgantes.
+- El festejo ya no salta: se juega donde Clawd estaba (0.17.0). El salto
+  sigue en la siguiente escena `home` (quieto), hasta que exista el
+  entremedio.
+
 ## Verificación pendiente
 
 - Sesión real: trabajar con lecturas, comandos largos, tests y commits; ver que
   no hay cortes ni saltos, y la convivencia con image-preview.
-- Se mantiene un salto ya existente: al terminar el turno Clawd festeja en su
-  lugar a la izquierda (`home`), venga de donde venga.
 - Ver el gorro en una sesión real (`/clawd-mood gorro siempre`), incluida la
   recarga del plugin al cambiar la opción.

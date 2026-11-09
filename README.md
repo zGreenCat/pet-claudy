@@ -8,6 +8,7 @@ Clawd, the Claude Code mascot, above the prompt. It reacts to what Claude is doi
 - **fuma**: takes a smoke break now and then when idle.
 - **duerme**: falls asleep after 3 minutes idle.
 - **celebra**: cheers with confetti when a turn ends.
+- **camina**: while Claude works, Clawd walks three-quarters on, turns to face you and stops to dance or cook, then walks on. It steps at 8 frames a second; everything else keeps its pace.
 - **agentes**: each subagent walks out of Clawd with its own laptop, shows what it is doing in a bubble, and walks back in when it finishes.
 
 In December Clawd wears a Santa hat. It follows its head through every pose
@@ -53,6 +54,7 @@ node scripts/preview.ts todos    # play them in turn
 node scripts/preview.ts cambios  # a made-up turn, scene after scene
 node scripts/preview.ts gorro    # the Santa hat over the poses that move the head
 node scripts/preview.ts navidad  # December in seconds: the tree filling in and lighting up
+node scripts/preview.ts caminata # work as it plays now: walking three-quarters on, then dancing in place
 ```
 
 ## Pixel editor

@@ -76,11 +76,13 @@ export const register: Register = (on, options) => {
     if (day === undefined || bodyColumns < TREE_MIN_COLUMNS) return undefined
     return treeCells(day, lit, isBusy(), t)
   }
+  // The half tick within the tick: 1 between ticks, 0 on one
+  let half = 0
   // What Clawd shows now. Stepping the director here, not only on the clock,
   // lets an event show at once when the scene it waits on can already end
   function shown() {
     director = step(director, context(), t)
-    return dress(pose(director, context(), t, usableColumns(bodyColumns, decor())), worn())
+    return dress(pose(director, context(), t, usableColumns(bodyColumns, decor()), half), worn())
   }
 
   function drawKey(): string {
@@ -90,7 +92,7 @@ export const register: Register = (on, options) => {
 
   function soloScene(): Segment[][] {
     const v = shown()
-    return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns, decor())
+    return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns, decor(), v.quarters)
   }
 
   function desksScene() {
@@ -111,25 +113,30 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     // The clock must outlive a bad tick: a period that fails would end the
-    // interval, and Clawd would freeze on whatever it last drew
-    $.clock.every(TICK_MS, async () => {
+    // interval, and Clawd would freeze on whatever it last drew.
+    // Half ticks, for a walk that steps twice a tick; everything else keeps to
+    // the whole ticks, every other half
+    $.clock.every(TICK_MS / 2, async () => {
       try {
-        t += 1
-        idleTicks = isBusy() ? 0 : idleTicks + 1
-        if (readingFrom !== undefined && t - (reads[reads.length - 1] ?? t) > READING_LINGER_TICKS) readingFrom = undefined
-        agents = walk(agents, t, usableColumns(bodyColumns, decor()))
+        half = 1 - half
+        if (half === 0) {
+          t += 1
+          idleTicks = isBusy() ? 0 : idleTicks + 1
+          if (readingFrom !== undefined && t - (reads[reads.length - 1] ?? t) > READING_LINGER_TICKS) readingFrom = undefined
+          agents = walk(agents, t, usableColumns(bodyColumns, decor()))
 
-        // An agent whose loop ended without a SubagentStop still leaves its desk
-        const waiting = agents.filter(a => a.doneAt === undefined && t - a.bornAt >= RECONCILE_TICKS)
-        if (waiting.length > 0 && t % RECONCILE_TICKS === 0) {
-          const list = await $.agent.list()
-          for (const a of waiting) {
-            const info = list.find(i => i.id === a.id)
-            if (!info) finish(a.id, 'listo')
-            else if (ENDED[info.status]) {
-              finish(a.id, ENDED[info.status]!)
-              // A subagent that failed or was stopped leaves Clawd dizzy
-              if (info.status !== 'completed') director = cue(director, 'dizzy', t)
+          // An agent whose loop ended without a SubagentStop still leaves its desk
+          const waiting = agents.filter(a => a.doneAt === undefined && t - a.bornAt >= RECONCILE_TICKS)
+          if (waiting.length > 0 && t % RECONCILE_TICKS === 0) {
+            const list = await $.agent.list()
+            for (const a of waiting) {
+              const info = list.find(i => i.id === a.id)
+              if (!info) finish(a.id, 'listo')
+              else if (ENDED[info.status]) {
+                finish(a.id, ENDED[info.status]!)
+                // A subagent that failed or was stopped leaves Clawd dizzy
+                if (info.status !== 'completed') director = cue(director, 'dizzy', t)
+              }
             }
           }
         }

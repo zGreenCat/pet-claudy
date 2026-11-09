@@ -3,8 +3,8 @@
 // cleanly, a moment or the cheer plays to its end, and the events that come
 // meanwhile wait their turn. Pure: the clock steps it, the tests drive it.
 
-import { SCENES, headOf, want, walked } from './clawd.ts'
-import type { Context, Mood, SceneId, View } from './clawd.ts'
+import { SCENES, headOf, mirrored, strolled, want } from './clawd.ts'
+import type { Context, Mood, Place, Scene, SceneId, View } from './clawd.ts'
 
 // What arrives from outside: a moment, or a turn that answered
 export type Cue = 'celebrate' | Mood
@@ -57,6 +57,8 @@ function enter(d: Director, id: SceneId, t: number): Director {
   return { ...d, id, from: t, offset: id === 'work' ? worked : 0, exitFrom: undefined, worked }
 }
 
+const placeOf = (scene: Scene, s: number): Place => scene.placeAt?.(s) ?? scene.place
+
 // One tick: keep playing, begin the way out, or begin the next scene. It can
 // run more than once in a tick, so an event shows at once when what Clawd is
 // doing can already give way
@@ -86,19 +88,29 @@ export function step(d: Director, c: Context, t: number): Director {
     }
   }
 
-  const place = next.exitFrom !== undefined ? 'stand' : SCENES[next.id].place
+  const place = next.exitFrom !== undefined ? 'stand' : placeOf(SCENES[next.id], next.offset + t - next.from)
   const steps = t > d.at ? 1 : 0
   const walkT = place === 'walk' ? next.walkT + steps : place === 'home' ? 0 : next.walkT
   return { ...next, walkT, at: t }
 }
 
-// What Clawd shows at tick `t`
-export function pose(d: Director, c: Context, t: number, bodyColumns: number): View {
+// What Clawd shows at tick `t`, `half` a tick on: a step on its own feet
+// shows every half tick, facing where it goes, and front-on where it turns
+// back at the band's end
+export function pose(d: Director, c: Context, t: number, bodyColumns: number, half = 0): View {
   const scene = SCENES[d.id]
   const isExiting = d.exitFrom !== undefined
-  const { dx = 0, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(d.offset + t - d.from)
-  const place = isExiting ? 'stand' : scene.place
-  const x = place === 'home' ? 0 : walked(d.walkT, bodyColumns)
-  const head = scene.coversHead ? undefined : headOf(p.frame)
-  return { ...p, x: x + dx, isWorking: d.id === 'celebrate' || c.isWorking, head }
+  const s = d.offset + t - d.from
+  const { dx = 0, walking, quarters, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(s, half)
+  const place = isExiting ? 'stand' : placeOf(scene, s)
+  const x = place === 'home' ? 0 : strolled(d.walkT, bodyColumns)
+  let drawn = quarters
+  if (walking && quarters) {
+    const ahead = strolled(d.walkT + 1, bodyColumns)
+    const isTurning = ahead === x || (d.walkT > 0 && strolled(d.walkT - 1, bodyColumns) === ahead)
+    drawn = isTurning ? undefined : ahead < x ? mirrored(quarters) : quarters
+  }
+  // Nothing worn over a pose drawn in pixels: what it wears follows the cells
+  const head = scene.coversHead || drawn ? undefined : headOf(p.frame)
+  return { ...p, x: x + dx, isWorking: d.id === 'celebrate' || c.isWorking, head, ...(drawn ? { quarters: drawn } : {}) }
 }

@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { CELEBRATE_TICKS, MOMENT_TICKS, READING_LINGER_TICKS } from './clawd'
+import { CELEBRATE_TICKS, MOMENT_TICKS, READING_LINGER_TICKS, STOP_TICKS, WALK_STEPS, WALK_TICKS, mirrored } from './clawd'
 import type { Context, View } from './clawd'
 import { STALE_TICKS, cue, pose, reset, start, step } from './director'
 import type { Director } from './director'
@@ -21,40 +21,51 @@ function play(d: Director, from: number, to: number, ctx: (t: number) => Context
 
 // The row of the food in the pan, if Clawd is cooking
 const food = (v: View) => v.marks.find(m => /^[{(<[]/.test(m.text))?.row
+// The first tick from `from` on whose view passes `ok`
+const first = (shown: View[], from: number, ok: (v: View) => boolean) => shown.findIndex((v, t) => t >= from && !!v && ok(v))
+// Working in place, front-on: the dance, or a turn into it
+const isDancing = (v: View) => v.quarters === undefined && /^(pensando|trabajando|bailando)/.test(v.line)
 
 test('cooking, a moment waits for the food to land in the pan', () => {
-  // Working from tick 0, cooking from tick 72; the food is in the air at 75
-  let { d, shown } = play(start(0), 0, 75, () => WORKING)
-  expect(shown[75]!.line).toMatch(/^cocinando/)
-  expect(food(shown[75]!)).not.toBe(2)
-  d = cue(d, 'cool', 75)
-  ;({ d, shown } = play(d, 76, 90, () => WORKING))
-  // The toss ends at 79 with the food back in the pan; the moment begins at 80
-  expect(shown[79]!.line).toMatch(/^cocinando/)
-  expect(food(shown[79]!)).toBe(2)
-  expect(shown[80]!.line).toBe('momento…')
+  // Work stops to cook some rounds in: find a tick with the food in the air
+  const { shown: before } = play(start(0), 0, 600, () => WORKING)
+  const tossing = first(before, 0, v => v.line.startsWith('cocinando') && food(v) !== undefined && food(v) !== 2)
+  expect(tossing).toBeGreaterThan(0)
+  let { d } = play(start(0), 0, tossing, () => WORKING)
+  d = cue(d, 'cool', tossing)
+  const { shown } = play(d, tossing + 1, tossing + 20, () => WORKING)
+  // The moment begins right after a tick with the food back in the pan
+  const begins = first(shown, tossing + 1, v => v.line === 'momento…')
+  expect(begins).toBeGreaterThan(tossing + 1)
+  expect(shown[begins - 1]!.line).toMatch(/^cocinando/)
+  expect(food(shown[begins - 1]!)).toBe(2)
 })
 
 test('a turn that ends mid-dance lets the dance finish its turn before the cheer', () => {
-  let { d, shown } = play(start(0), 0, 9, () => WORKING)
-  d = cue(d, 'celebrate', 9)
-  ;({ d, shown } = play(d, 10, 14, () => IDLE))
-  // The dance comes back to both feet every 6 ticks: 12 is the first point it can stop
-  expect(shown[11]!.line).toMatch(/^pensando/)
-  expect(shown[12]!.line).toBe('¡listo!')
+  // Work stops to dance after its first walk and turn: two ticks into the dance
+  const dancing = WALK_TICKS + 1 + 2
+  let { d, shown } = play(start(0), 0, dancing, () => WORKING)
+  expect(isDancing(shown[dancing]!)).toBe(true)
+  d = cue(d, 'celebrate', dancing)
+  ;({ d, shown } = play(d, dancing + 1, dancing + 10, () => IDLE))
+  // The dance comes back to both feet every 6 ticks: four more, then the cheer
+  expect(shown[dancing + 3]!.line).toMatch(/^pensando/)
+  expect(shown[dancing + 4]!.line).toBe('¡listo!')
 })
 
-test('after a moment, work picks up its line where it left off, at the start of a step', () => {
-  let { d } = play(start(0), 0, 30, () => WORKING)
-  d = cue(d, 'idea', 30)
-  const end = 36 + MOMENT_TICKS.idea
-  const { shown } = play(d, 31, end + 1, () => WORKING)
-  // The dance stops at 36, its feet together, and picks up there after
-  expect(shown[35]!.line).toMatch(/^trabajando/)
-  expect(shown[36]!.line).toBe('mmm…')
-  expect(shown[end - 1]!.line).toBe('¡idea!')
-  expect(shown[end]!.line).toMatch(/^trabajando/)
-  expect(shown[end]!.frame).toEqual(play(start(0), 0, 0, () => WORKING).shown[0]!.frame)
+test('after a moment, work picks up where it left off', () => {
+  // Some rounds in, dancing with the second line up
+  const { shown: before } = play(start(0), 0, 600, () => WORKING)
+  const at = first(before, 0, v => isDancing(v) && v.line.startsWith('trabajando'))
+  let { d } = play(start(0), 0, at, () => WORKING)
+  d = cue(d, 'idea', at)
+  const { shown } = play(d, at + 1, at + 60, () => WORKING)
+  const begins = first(shown, at + 1, v => v.line === 'mmm…')
+  const ends = first(shown, begins, v => !['mmm…', '¡oh!', '¡idea!'].includes(v.line))
+  expect(ends - begins).toBe(MOMENT_TICKS.idea)
+  // Back on the same line, dancing on from the step it stopped at
+  expect(shown[ends]!.line).toMatch(/^trabajando/)
+  expect(shown[ends]!.frame).toEqual(shown[begins - 1]!.frame)
 })
 
 test('work interrupted often still gets to cook', () => {
@@ -119,13 +130,13 @@ test('the cheer does not cut a fall short; a new prompt does', () => {
   expect(pose(step(d, WORKING, t), WORKING, t, 80).line).toMatch(/^pensando/)
 })
 
-test('reading begins where the dance can stop, and the book is put away after', () => {
+test('reading begins at the end of a step, and the book is put away after', () => {
   const lastRead = 30
   const ctx = (t: number): Context => ({ ...WORKING, readingFor: t >= 3 && t <= lastRead + READING_LINGER_TICKS ? t - 3 : undefined })
   const { shown } = play(start(0), 0, 60, ctx)
-  // Reads from tick 3; the dance first stops at 6
-  expect(shown[5]!.line).toMatch(/^pensando/)
-  expect(shown[6]!.line).toBe('leyendo…')
+  // Reads from tick 3; walking, it first ends a step at 4
+  expect(shown[3]!.line).toMatch(/^pensando/)
+  expect(shown[4]!.line).toBe('leyendo…')
   const end = lastRead + READING_LINGER_TICKS + 1
   // A page turned, the book away, then back to work
   expect(shown[end]!.frame[1]).toContain('6')
@@ -154,4 +165,60 @@ test('walking, Clawd moves a cell at a time, pan or no pan, and stands still for
   expect(begins).toBeGreaterThan(120)
   const stood = shown[begins - 1]!.x
   for (let t = begins; t <= 140; t++) expect(shown[t]!.x).toBe(stood)
+})
+
+test('work walks three-quarters on, turns front, stops to dance, and walks on', () => {
+  const { shown } = play(start(0), 0, 2 * (WALK_TICKS + STOP_TICKS + 2), () => WORKING)
+  for (let t = 1; t < WALK_TICKS; t++) expect(shown[t]!.quarters).toBeDefined()
+  // A turn front-on, the dance in place, a turn back
+  expect(shown[WALK_TICKS]!.quarters).toBeUndefined()
+  expect(shown[WALK_TICKS]!.frame[0]).toBe('.OLOORO.')
+  const stop = WALK_TICKS + 1
+  for (let t = stop; t < stop + STOP_TICKS; t++) {
+    expect(isDancing(shown[t]!)).toBe(true)
+    expect(shown[t]!.x).toBe(shown[stop]!.x)
+  }
+  expect(shown[stop + STOP_TICKS + 1]!.quarters).toBeDefined()
+})
+
+test('a step shows every half tick, mirrored going left, and front-on where it turns back', () => {
+  const columns = 50
+  const { shown } = play(start(0), 0, 600, () => WORKING, columns)
+  // Steps differ between the two halves of a tick
+  const walkingAt = first(shown, 1, v => v.quarters !== undefined)
+  const halfway = play(start(0), 0, walkingAt, () => WORKING, columns).d
+  expect(pose(halfway, WORKING, walkingAt, columns, 1).quarters).not.toEqual(shown[walkingAt]!.quarters)
+  const facingRight = new Set(WALK_STEPS.map(f => f.join('|')))
+  const facingLeft = new Set(WALK_STEPS.map(f => mirrored(f).join('|')))
+  let left = 0
+  let right = 0
+  for (let t = 1; t < 600; t++) {
+    const v = shown[t]!
+    const prev = shown[t - 1]!
+    if (!v.quarters || !prev.quarters) continue
+    if (v.x < prev.x) {
+      left += 1
+      expect(facingLeft.has(v.quarters.join('|'))).toBe(true)
+    }
+    if (v.x > prev.x) {
+      right += 1
+      expect(facingRight.has(v.quarters.join('|'))).toBe(true)
+    }
+  }
+  expect(left).toBeGreaterThan(0)
+  expect(right).toBeGreaterThan(0)
+  // At the far end of its span it stands front-on for the turn
+  const far = Math.max(...shown.map(v => v!.x))
+  const turn = first(shown, 1, v => v.x === far)
+  expect(shown[turn]!.quarters).toBeUndefined()
+})
+
+test('a turn that ends while Clawd walks cheers where it stands, not back at its spot', () => {
+  let { d, shown } = play(start(0), 0, 8, () => WORKING)
+  d = cue(d, 'celebrate', 8)
+  ;({ shown } = play(d, 9, 20, () => IDLE))
+  // It ends its step, then cheers right there
+  const cheer = first(shown, 9, v => v.line === '¡listo!')
+  expect(shown[cheer - 1]!.x).toBeGreaterThan(0)
+  for (let t = cheer; t < cheer + 6; t++) expect(shown[t]!.x).toBe(shown[cheer - 1]!.x)
 })

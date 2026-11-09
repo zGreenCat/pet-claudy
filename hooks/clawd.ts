@@ -125,6 +125,47 @@ const DANCE: Frame[] = [
 
 const IDLE: Frame = [HEAD, BODY, LEGS]
 const BLINK: Frame = [HEAD_BLINK, BODY, LEGS]
+
+// Walking three-quarters on, in pixels two to a cell each way over Clawd's
+// three rows: O its body, D the body's shade, K an eye. The shaded side is
+// behind, the face ahead with both eyes, and the legs step in two groups,
+// each with a shaded far leg. Drawn facing right; going left it is mirrored
+export const WALK_STEPS: readonly string[][] = [
+  [
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOKOOOOOKO..',
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOOOOOOOOO..',
+    '.D.O.O.OD.O.O...',
+    '................',
+  ],
+  [
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOKOOOOOKO..',
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOOOOOOOOO..',
+    '.DO.O.O..DO.O...',
+    '................',
+  ],
+  [
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOKOOOOOKO..',
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOOOOOOOOO..',
+    '..D.O.O..D.O.O..',
+    '................',
+  ],
+  [
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOKOOOOOKO..',
+    '.DDDOOOOOOOOOO..',
+    '.DDDOOOOOOOOOO..',
+    '.D.O.D.OD..O.O..',
+    '................',
+  ],
+]
+
+export const mirrored = (pixels: readonly string[]): string[] => pixels.map(row => [...row].reverse().join(''))
 const COOK: Frame = [HEAD, BODY_PAN, LEGS]
 
 const FOOD = ['{}', '()', '<>', '[]']
@@ -162,11 +203,27 @@ export function walked(t: number, bodyColumns: number): number {
   return bounce(Math.floor(t / 2), Math.min(40, bodyColumns - WALK_WIDTH - 22))
 }
 
+// Where Clawd stands after `k` ticks of walking on its own feet: a cell a
+// tick, back and forth over the same span
+export function strolled(k: number, bodyColumns: number): number {
+  return bounce(k, Math.min(40, bodyColumns - WALK_WIDTH - 22))
+}
+
 // Where Clawd's head is, for what it wears on it: up, sunk half a cell, or
 // upside down on the ground. Undefined when the scene has something on it
 // already (the headphones, the bulb)
 export type Head = 'up' | 'sunk' | 'down'
-export type View = { frame: Frame; marks: Mark[]; x: number; line: string; isWorking: boolean; head?: Head }
+// A pose drawn in pixels (`quarters`) is drawn so in place of its frame; the
+// frame stays as the front-on Clawd for where only cells will do (the desks)
+export type View = {
+  frame: Frame
+  marks: Mark[]
+  x: number
+  line: string
+  isWorking: boolean
+  head?: Head
+  quarters?: readonly string[]
+}
 
 // The head of a pose, read off its frame, so no pose has to say: legs in the
 // top row mean it has fallen, a top row of raised halves means it has sunk
@@ -443,11 +500,11 @@ export function isSmoking(idleTicks: number): boolean {
   )
 }
 
-// Working, `s` ticks into it: dancing, the line changing every six seconds,
-// and one line in four cooking code in a pan. 24 ticks is three tosses and four
+// Working, `s` ticks into dancing: the line changing every six seconds, and
+// one line in four cooking code in a pan. 24 ticks is three tosses and four
 // turns of the dance, so each line ends with the food in the pan or the feet
 // together
-function working(s: number): Pose {
+function dancing(s: number): Pose {
   const line = WORKING_LINES[Math.floor(s / 24) % WORKING_LINES.length]!
   const pose = isCookingAt(s) ? cooking(s) : { frame: DANCE[s % DANCE.length]!, marks: [] }
   const dots = '.'.repeat((Math.floor(s / 2) % 3) + 1)
@@ -456,6 +513,34 @@ function working(s: number): Pose {
 
 function isCookingAt(s: number): boolean {
   return WORKING_LINES[Math.floor(s / 24) % WORKING_LINES.length]!.startsWith('cocinando')
+}
+
+// Work goes in rounds: a stretch walking three-quarters on, a turn to face
+// front, a stop to dance or cook as before, and a turn back. The dance and the
+// pan keep their own count across rounds, so their lines go on turning
+export const WALK_TICKS = 12
+export const STOP_TICKS = 16
+const TURN_TICKS = 1
+const ROUND = WALK_TICKS + TURN_TICKS + STOP_TICKS + TURN_TICKS
+
+type Round = { phase: 'walk' | 'turn' | 'stop'; danced: number }
+function round(s: number): Round {
+  const k = s % ROUND
+  const before = Math.floor(s / ROUND) * STOP_TICKS
+  if (k < WALK_TICKS) return { phase: 'walk', danced: before }
+  if (k < WALK_TICKS + TURN_TICKS) return { phase: 'turn', danced: before }
+  if (k < WALK_TICKS + TURN_TICKS + STOP_TICKS) return { phase: 'stop', danced: before + k - WALK_TICKS - TURN_TICKS }
+  return { phase: 'turn', danced: before + STOP_TICKS }
+}
+
+// Working, `s` ticks into it and `half` a tick on: walking takes a step every
+// half tick, the rest goes by whole ticks
+function working(s: number, half = 0): Pose {
+  const r = round(s)
+  if (r.phase === 'stop') return dancing(r.danced)
+  const { line } = dancing(r.danced)
+  if (r.phase === 'turn') return { frame: IDLE, marks: [], line }
+  return { frame: IDLE, marks: [], line, quarters: WALK_STEPS[(s * 2 + half) % WALK_STEPS.length]!, walking: true }
 }
 
 // Waiting, `s` ticks into it: a blink once every ~4s, a sway every second
@@ -515,7 +600,7 @@ function bare(
     return { ...listening(listened), x: walked(Math.max(0, t - listened), bodyColumns), isWorking, head: undefined }
   }
   if (isWorking) {
-    return { ...working(t), x: walked(t, bodyColumns), isWorking }
+    return { ...dancing(t), x: walked(t, bodyColumns), isWorking }
   }
   if (idleTicks >= SLEEP_AFTER_TICKS) {
     return { frame: BLINK, marks: [], x: 0, line: 'zzz', isWorking }
@@ -532,19 +617,23 @@ function bare(
 // reading, a break) runs while it is wanted and gives way only where it can
 // stop cleanly; a scene with a length (a moment, the cheer) plays to its end
 export type SceneId = 'celebrate' | Mood | 'read' | 'music' | 'work' | 'sleep' | 'smoke' | 'coffee' | 'idle'
-export type Pose = { frame: Frame; marks: Mark[]; line: string; dx?: number }
+// `walking`: a step on its own feet, facing where it goes: the director
+// mirrors it going left and turns it front-on at the band's ends
+export type Pose = { frame: Frame; marks: Mark[]; line: string; dx?: number; quarters?: readonly string[]; walking?: boolean }
 // Where it stands: walking about the band, still where it stood, or at its
 // spot at the left
 export type Place = 'walk' | 'stand' | 'home'
 export type Scene = {
   place: Place
+  // Where it stands `s` ticks in, for a scene that walks only part of the time
+  placeAt?: (s: number) => Place
   // Ticks a scene with an end lasts
   length?: number
   // Ticks a loop holds at least once it begins, so it does not flicker
   minTicks?: number
   // Whether a loop `s` ticks in may give way: not mid-toss nor mid-sip
   canLeave?: (s: number) => boolean
-  play: (s: number) => Pose
+  play: (s: number, half?: number) => Pose
   // A short way out before the next scene: the book closes, the headphones
   // come off. Clawd stands where it stood meanwhile
   exit?: { ticks: number; play: (s: number) => Pose }
@@ -557,7 +646,8 @@ function momentScene(mood: Mood): Scene {
 }
 
 export const SCENES: Record<SceneId, Scene> = {
-  celebrate: { place: 'home', length: CELEBRATE_TICKS, play: celebrating },
+  // Where it stood when the turn ended, not back at its spot: no jump to cheer
+  celebrate: { place: 'stand', length: CELEBRATE_TICKS, play: celebrating },
   cool: momentScene('cool'),
   love: momentScene('love'),
   // The bulb hangs where a hat would sit
@@ -592,9 +682,16 @@ export const SCENES: Record<SceneId, Scene> = {
   },
   work: {
     place: 'walk',
+    placeAt: s => (round(s).phase === 'walk' ? 'walk' : 'stand'),
     minTicks: 4,
-    // The food back in the pan, or the dance back on both feet
-    canLeave: s => (isCookingAt(s) ? s % TOSS.length === 0 : s % DANCE.length === 0),
+    // Walking, at the end of a step; stopped, the food back in the pan or the
+    // dance back on both feet
+    canLeave: s => {
+      const r = round(s)
+      if (r.phase === 'walk') return s % 2 === 0
+      if (r.phase === 'turn') return true
+      return isCookingAt(r.danced) ? r.danced % TOSS.length === 0 : r.danced % DANCE.length === 0
+    },
     play: working,
   },
   sleep: { place: 'home', play: () => ({ frame: BLINK, marks: [], line: 'zzz' }) },
@@ -617,5 +714,5 @@ export function want(c: Context): SceneId {
 }
 
 export function viewKey(v: View): string {
-  return `${v.frame.join('|')}#${v.x}#${v.line}#${JSON.stringify(v.marks)}`
+  return `${v.frame.join('|')}#${v.quarters?.join('|') ?? ''}#${v.x}#${v.line}#${JSON.stringify(v.marks)}`
 }

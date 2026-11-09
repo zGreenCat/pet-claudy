@@ -54,6 +54,16 @@ function hatted(t: number, c: number): View {
 // waits for the one before to stop cleanly
 const DIRECTED_TICKS = 200
 const DIRECTED_CUES: Record<number, Cue> = { 66: 'cool', 67: 'love', 170: 'celebrate' }
+// Work as the plugin plays it, at half ticks: walking three-quarters on, a
+// turn, a stop to dance or cook, and on again. `h` counts half ticks
+let walker = start(0)
+function walking(h: number, columns: number): View {
+  const t = Math.floor(h / 2)
+  const ctx: Context = { idleTicks: 0, isWorking: true }
+  walker = step(walker, ctx, t)
+  return pose(walker, ctx, t, columns, h % 2)
+}
+
 function directed(t: number, columns: number): View {
   const ctx = (k: number): Context => ({
     idleTicks: k < 170 ? 0 : k - 170,
@@ -90,6 +100,7 @@ const MOODS: Mood[] = [
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: (t, c) => view(t, 0, true, c, undefined, undefined, undefined, 8 + t) },
   { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
   { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
+  { name: 'caminata', about: 'trabajando: camina de tres cuartos, gira, se detiene a bailar o cocinar (8 cuadros por segundo)', at: walking },
   {
     name: 'navidad',
     about: 'diciembre: el árbol se arma día a día y se enciende con los turnos',
@@ -165,7 +176,7 @@ const timer = setInterval(() => {
   if (mood.at) {
     const k = arg === 'todos' ? t % HOLD : t
     const v = mood.at(k, columns())
-    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns(), mood.decor?.(k)))
+    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns(), mood.decor?.(k), v.quarters))
     t += 1
     return
   }
@@ -189,4 +200,5 @@ const timer = setInterval(() => {
     clearInterval(timer)
     process.stdout.write('\nfin: todos se fueron\n')
   }
-}, TICK_MS)
+  // The walk steps twice a tick; every other mood keeps the plugin's tick
+}, arg === 'caminata' ? TICK_MS / 2 : TICK_MS)
