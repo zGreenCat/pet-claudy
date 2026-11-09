@@ -165,6 +165,17 @@ export const WALK_STEPS: readonly string[][] = [
   ],
 ]
 
+// Half turned between three-quarters and front-on: one column of shaded
+// side, the eyes halfway over, the far arm out. Facing right, like the steps
+export const HALF_TURN: readonly string[] = [
+  '.DOOOOOOOOOOOO..',
+  '.DOOOKOOOOOKOO..',
+  '.DOOOOOOOOOOOOO.',
+  '.DOOOOOOOOOOOO..',
+  '.D.O.O.....O.O..',
+  '................',
+]
+
 export const mirrored = (pixels: readonly string[]): string[] => pixels.map(row => [...row].reverse().join(''))
 const COOK: Frame = [HEAD, BODY_PAN, LEGS]
 
@@ -523,14 +534,15 @@ export const STOP_TICKS = 16
 const TURN_TICKS = 1
 const ROUND = WALK_TICKS + TURN_TICKS + STOP_TICKS + TURN_TICKS
 
-type Round = { phase: 'walk' | 'turn' | 'stop'; danced: number }
+// A turn is `in` from walking to the stop, `out` from the stop to walking
+type Round = { phase: 'walk' | 'turn' | 'stop'; danced: number; turn?: 'in' | 'out' }
 function round(s: number): Round {
   const k = s % ROUND
   const before = Math.floor(s / ROUND) * STOP_TICKS
   if (k < WALK_TICKS) return { phase: 'walk', danced: before }
-  if (k < WALK_TICKS + TURN_TICKS) return { phase: 'turn', danced: before }
+  if (k < WALK_TICKS + TURN_TICKS) return { phase: 'turn', danced: before, turn: 'in' }
   if (k < WALK_TICKS + TURN_TICKS + STOP_TICKS) return { phase: 'stop', danced: before + k - WALK_TICKS - TURN_TICKS }
-  return { phase: 'turn', danced: before + STOP_TICKS }
+  return { phase: 'turn', danced: before + STOP_TICKS, turn: 'out' }
 }
 
 // Working, `s` ticks into it and `half` a tick on: walking takes a step every
@@ -539,7 +551,7 @@ function working(s: number, half = 0): Pose {
   const r = round(s)
   if (r.phase === 'stop') return dancing(r.danced)
   const { line } = dancing(r.danced)
-  if (r.phase === 'turn') return { frame: IDLE, marks: [], line }
+  if (r.phase === 'turn') return { frame: IDLE, marks: [], line, turning: r.turn }
   return { frame: IDLE, marks: [], line, quarters: WALK_STEPS[(s * 2 + half) % WALK_STEPS.length]!, walking: true }
 }
 
@@ -617,9 +629,18 @@ function bare(
 // reading, a break) runs while it is wanted and gives way only where it can
 // stop cleanly; a scene with a length (a moment, the cheer) plays to its end
 export type SceneId = 'celebrate' | Mood | 'read' | 'music' | 'work' | 'sleep' | 'smoke' | 'coffee' | 'idle'
-// `walking`: a step on its own feet, facing where it goes: the director
-// mirrors it going left and turns it front-on at the band's ends
-export type Pose = { frame: Frame; marks: Mark[]; line: string; dx?: number; quarters?: readonly string[]; walking?: boolean }
+// `walking`: a step on its own feet, facing where it goes; `turning`: from
+// the walk to front-on (`in`) or back (`out`). The director knows which way
+// Clawd goes: it mirrors the drawing going left and half turns it
+export type Pose = {
+  frame: Frame
+  marks: Mark[]
+  line: string
+  dx?: number
+  quarters?: readonly string[]
+  walking?: boolean
+  turning?: 'in' | 'out'
+}
 // Where it stands: walking about the band, still where it stood, or at its
 // spot at the left
 export type Place = 'walk' | 'stand' | 'home'

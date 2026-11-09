@@ -165,8 +165,10 @@ sombra.
 - El reloj corre a medio tick (125 ms). Todo lo demás avanza en ticks enteros
   como antes; solo los pasos cambian cada medio tick (8 por segundo). Camina
   una celda por tick (`strolled`).
-- El director espeja los pasos al ir a la izquierda y muestra a Clawd de frente
-  en el tick en que se da vuelta en un borde.
+- El director espeja los pasos al ir a la izquierda. Los giros usan el medio
+  giro (`HALF_TURN`, 0.18.0) medio tick: al detenerse, medio giro mirando de
+  donde venía y luego de frente; al volver a caminar, de frente y luego medio
+  giro hacia donde va; en un borde, medio giro hacia un lado y hacia el otro.
 - Las poses en píxeles van en `View.quarters`; `solo` las pinta con
   `paintQuarters`. El frame de frente queda como respaldo para los
   escritorios. Mientras camina no lleva gorro (pendiente: calzarlo en tres

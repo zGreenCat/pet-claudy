@@ -3,7 +3,7 @@
 // cleanly, a moment or the cheer plays to its end, and the events that come
 // meanwhile wait their turn. Pure: the clock steps it, the tests drive it.
 
-import { SCENES, headOf, mirrored, strolled, want } from './clawd.ts'
+import { HALF_TURN, SCENES, headOf, mirrored, strolled, want } from './clawd.ts'
 import type { Context, Mood, Place, Scene, SceneId, View } from './clawd.ts'
 
 // What arrives from outside: a moment, or a turn that answered
@@ -94,21 +94,29 @@ export function step(d: Director, c: Context, t: number): Director {
   return { ...next, walkT, at: t }
 }
 
-// What Clawd shows at tick `t`, `half` a tick on: a step on its own feet
-// shows every half tick, facing where it goes, and front-on where it turns
-// back at the band's end
+// What Clawd shows at tick `t`, `half` a tick on. A step on its own feet
+// shows every half tick, facing where it goes. Turning, it half turns for
+// half a tick: on its way to front-on it faces where it came from, on its way
+// back to walking where it goes, and at the band's end both, one half each
 export function pose(d: Director, c: Context, t: number, bodyColumns: number, half = 0): View {
   const scene = SCENES[d.id]
   const isExiting = d.exitFrom !== undefined
   const s = d.offset + t - d.from
-  const { dx = 0, walking, quarters, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(s, half)
+  const { dx = 0, walking, turning, quarters, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(s, half)
   const place = isExiting ? 'stand' : placeOf(scene, s)
   const x = place === 'home' ? 0 : strolled(d.walkT, bodyColumns)
+  // Which way it came, and which way it goes on: 1 right, -1 left, 0 still
+  const came = d.walkT > 0 ? Math.sign(x - strolled(d.walkT - 1, bodyColumns)) : 0
+  const goes = Math.sign(strolled(d.walkT + 1, bodyColumns) - x)
+  const facing = (pixels: readonly string[], way: number) => (way < 0 ? mirrored(pixels) : pixels)
   let drawn = quarters
   if (walking && quarters) {
-    const ahead = strolled(d.walkT + 1, bodyColumns)
-    const isTurning = ahead === x || (d.walkT > 0 && strolled(d.walkT - 1, bodyColumns) === ahead)
-    drawn = isTurning ? undefined : ahead < x ? mirrored(quarters) : quarters
+    const isTurningBack = goes === 0 || (came !== 0 && came !== goes)
+    drawn = isTurningBack ? facing(HALF_TURN, half === 0 ? came || goes : goes || came) : facing(quarters, goes)
+  } else if (turning === 'in') {
+    drawn = half === 0 ? facing(HALF_TURN, came || goes) : undefined
+  } else if (turning === 'out') {
+    drawn = half === 0 ? undefined : facing(HALF_TURN, goes || came)
   }
   // Nothing worn over a pose drawn in pixels: what it wears follows the cells
   const head = scene.coversHead || drawn ? undefined : headOf(p.frame)

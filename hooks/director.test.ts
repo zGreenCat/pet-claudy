@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { CELEBRATE_TICKS, MOMENT_TICKS, READING_LINGER_TICKS, STOP_TICKS, WALK_STEPS, WALK_TICKS, mirrored } from './clawd'
+import { CELEBRATE_TICKS, HALF_TURN, MOMENT_TICKS, READING_LINGER_TICKS, STOP_TICKS, WALK_STEPS, WALK_TICKS, mirrored } from './clawd'
 import type { Context, View } from './clawd'
 import { STALE_TICKS, cue, pose, reset, start, step } from './director'
 import type { Director } from './director'
@@ -167,29 +167,36 @@ test('walking, Clawd moves a cell at a time, pan or no pan, and stands still for
   for (let t = begins; t <= 140; t++) expect(shown[t]!.x).toBe(stood)
 })
 
-test('work walks three-quarters on, turns front, stops to dance, and walks on', () => {
-  const { shown } = play(start(0), 0, 2 * (WALK_TICKS + STOP_TICKS + 2), () => WORKING)
+test('work walks three-quarters on, half turns to front, stops to dance, and walks on', () => {
+  const end = 2 * (WALK_TICKS + STOP_TICKS + 2)
+  const { shown } = play(start(0), 0, end, () => WORKING)
+  const at = (t: number, half: number) => pose(play(start(0), 0, t, () => WORKING).d, WORKING, t, 80, half)
   for (let t = 1; t < WALK_TICKS; t++) expect(shown[t]!.quarters).toBeDefined()
-  // A turn front-on, the dance in place, a turn back
-  expect(shown[WALK_TICKS]!.quarters).toBeUndefined()
-  expect(shown[WALK_TICKS]!.frame[0]).toBe('.OLOORO.')
+  // Turning in: half turned, facing the way it came (right), then front-on
+  expect(at(WALK_TICKS, 0).quarters).toEqual(HALF_TURN)
+  expect(at(WALK_TICKS, 1).quarters).toBeUndefined()
+  expect(at(WALK_TICKS, 1).frame[0]).toBe('.OLOORO.')
   const stop = WALK_TICKS + 1
   for (let t = stop; t < stop + STOP_TICKS; t++) {
     expect(isDancing(shown[t]!)).toBe(true)
     expect(shown[t]!.x).toBe(shown[stop]!.x)
   }
-  expect(shown[stop + STOP_TICKS + 1]!.quarters).toBeDefined()
+  // Turning out: front-on, then half turned the way it goes on
+  const out = stop + STOP_TICKS
+  expect(at(out, 0).quarters).toBeUndefined()
+  expect(at(out, 1).quarters).toEqual(HALF_TURN)
+  expect(shown[out + 1]!.quarters).toBeDefined()
 })
 
-test('a step shows every half tick, mirrored going left, and front-on where it turns back', () => {
+test('a step shows every half tick, mirrored going left, and Clawd swivels where it turns back', () => {
   const columns = 50
   const { shown } = play(start(0), 0, 600, () => WORKING, columns)
   // Steps differ between the two halves of a tick
   const walkingAt = first(shown, 1, v => v.quarters !== undefined)
   const halfway = play(start(0), 0, walkingAt, () => WORKING, columns).d
   expect(pose(halfway, WORKING, walkingAt, columns, 1).quarters).not.toEqual(shown[walkingAt]!.quarters)
-  const facingRight = new Set(WALK_STEPS.map(f => f.join('|')))
-  const facingLeft = new Set(WALK_STEPS.map(f => mirrored(f).join('|')))
+  const facingRight = new Set([...WALK_STEPS, HALF_TURN].map(f => f.join('|')))
+  const facingLeft = new Set([...WALK_STEPS, HALF_TURN].map(f => mirrored(f).join('|')))
   let left = 0
   let right = 0
   for (let t = 1; t < 600; t++) {
@@ -207,10 +214,13 @@ test('a step shows every half tick, mirrored going left, and front-on where it t
   }
   expect(left).toBeGreaterThan(0)
   expect(right).toBeGreaterThan(0)
-  // At the far end of its span it stands front-on for the turn
+  // At the far end of its span it swivels: half turned the way it came, then
+  // the way it goes back
   const far = Math.max(...shown.map(v => v!.x))
-  const turn = first(shown, 1, v => v.x === far)
-  expect(shown[turn]!.quarters).toBeUndefined()
+  const turn = first(shown, 1, v => v.x === far && v.quarters !== undefined)
+  const there = play(start(0), 0, turn, () => WORKING, columns).d
+  expect(pose(there, WORKING, turn, columns, 0).quarters).toEqual(HALF_TURN)
+  expect(pose(there, WORKING, turn, columns, 1).quarters).toEqual(mirrored(HALF_TURN))
 })
 
 test('a turn that ends while Clawd walks cheers where it stands, not back at its spot', () => {
