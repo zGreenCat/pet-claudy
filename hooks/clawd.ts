@@ -3,8 +3,8 @@
 // changed and the tests can drive it.
 
 import type { Mark } from './desks'
-import { COFFEE, HALF_TURN, IDLE as WAITING, MUSIC, READ, SMOKE, WALK, shotAt } from './poses.ts'
-import type { Shot } from './poses.ts'
+import { CHEER, COFFEE, HALF_TURN, IDLE as WAITING, MUSIC, READ, SLEEP, SMOKE, WALK, shotAt } from './poses.ts'
+import type { Eyes, Shot } from './poses.ts'
 
 export const TICK_MS = 250
 export const WIDTH = 8
@@ -190,6 +190,7 @@ export type View = {
   isWorking: boolean
   head?: Head
   quarters?: readonly string[]
+  eyes?: Eyes
 }
 
 // The head of a pose, read off its frame, so no pose has to say: legs in the
@@ -594,6 +595,7 @@ export type Pose = {
   line: string
   dx?: number
   quarters?: readonly string[]
+  eyes?: Eyes
   walking?: boolean
   turning?: 'in' | 'out'
 }
@@ -620,8 +622,17 @@ export type Scene = {
 
 // A scene drawn in the workshop: its shots in a loop, over the front-on frame
 // that stands in for it where only cells will do (the desks)
-function drawn(shots: readonly Shot[], line: string) {
-  return (s: number): Pose => ({ frame: IDLE, marks: [], line, quarters: shotAt(shots, s).px })
+function drawn(shots: readonly Shot[], line: string, frame: Frame = IDLE) {
+  return (s: number): Pose => {
+    const { px, eyes } = shotAt(shots, s)
+    return { frame, marks: [], line, quarters: px, ...(eyes ? { eyes } : {}) }
+  }
+}
+
+// The cheer drawn in the workshop; its frame and line as the cells cheer
+function cheering(s: number): Pose {
+  const { frame, line } = celebrating(s)
+  return drawn(CHEER, line, frame)(s)
 }
 
 // A way out half turned, then front-on: what it held is put away
@@ -638,7 +649,7 @@ function momentScene(mood: Mood): Scene {
 
 export const SCENES: Record<SceneId, Scene> = {
   // Where it stood when the turn ended, not back at its spot: no jump to cheer
-  celebrate: { place: 'stand', length: CELEBRATE_TICKS, play: celebrating },
+  celebrate: { place: 'stand', length: CELEBRATE_TICKS, play: cheering },
   cool: momentScene('cool'),
   love: momentScene('love'),
   // The bulb hangs where a hat would sit
@@ -670,7 +681,7 @@ export const SCENES: Record<SceneId, Scene> = {
     },
     play: working,
   },
-  sleep: { place: 'home', play: () => ({ frame: BLINK, marks: [], line: 'zzz' }) },
+  sleep: { place: 'home', play: drawn(SLEEP, 'zzz', BLINK) },
   // Not mid-puff nor mid-sip
   smoke: { place: 'home', minTicks: 4, canLeave: s => !shotAt(SMOKE, s).busy, play: drawn(SMOKE, 'en mi break') },
   coffee: { place: 'home', minTicks: 4, canLeave: s => !shotAt(COFFEE, s).busy, play: drawn(COFFEE, 'un cafecito') },
@@ -691,5 +702,5 @@ export function want(c: Context): SceneId {
 }
 
 export function viewKey(v: View): string {
-  return `${v.frame.join('|')}#${v.quarters?.join('|') ?? ''}#${v.x}#${v.line}#${JSON.stringify(v.marks)}`
+  return `${v.frame.join('|')}#${v.quarters?.join('|') ?? ''}#${v.eyes ?? ''}#${v.x}#${v.line}#${JSON.stringify(v.marks)}`
 }

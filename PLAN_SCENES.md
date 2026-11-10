@@ -198,6 +198,29 @@ cuatro píxeles adentro, `POSE_DX` en `desks.ts`).
   perfil). `view()` sin director sigue con las poses viejas; `preview.ts`
   muestra las nuevas en `quieto`, `lee`, `música`, `café` y `fuma`.
 
+## Lote 2: festejo y dormir (hecho en 0.20.0)
+
+Dibujados en el taller ("festejo 2" y "dormir") y retocados por la persona.
+
+| Escena | Dibujos |
+| --- | --- |
+| festejo | medio giro, se prepara en tres cuartos, salta en diagonal arriba a la derecha, medio giro en el aire, aterriza de frente con los brazos arriba y patea alternado, vuelve en diagonal espejado y se asienta. 28 ticks, como `CELEBRATE_TICKS`; "✓ listo" en los últimos 8 |
+| dormir | ojos cerrados, respira (exhala y estira 1 píxel al inhalar), una Z blanca nace al costado y sube. Bucle de 16 ticks |
+
+- **Ojos de carácter.** Los ojos de Clawd son medio cuadrado: un píxel. Lo que
+  los píxeles no dibujan (sonrisa, ojo cerrado) va como carácter en la celda
+  del ojo: `Shot.eyes` es `joy` (`^`) o `shut` (`▁`), oscuro sobre el cuerpo.
+  El festejo sonríe desde que despega hasta que cae; dormir, siempre cerrados.
+  El director solo los pasa con el dibujo propio de la escena, no con un paso
+  ni un medio giro.
+- El texto de Clawd va después de las 12 celdas del dibujo, que ahora puede
+  llegar a la última (el festejo, el cigarro).
+- El cuerpo no se deforma: las gesticulaciones son de las patas. El salto
+  sube 1 celda: en tres cuartos la sombra y el naranja comparten celdas, y un
+  píxel suelto dejaría una celda de dos colores con un vacío.
+- El confeti es de píxeles en las celdas libres de los costados; ya no cae
+  lejos a la derecha.
+
 ## Ideas anotadas
 
 - **Un entremedio para cambiar de lugar.** Las escenas que van en un sitio

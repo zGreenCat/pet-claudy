@@ -102,7 +102,7 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
   const scene = SCENES[d.id]
   const isExiting = d.exitFrom !== undefined
   const s = d.offset + t - d.from
-  const { dx = 0, walking, turning, quarters, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(s, half)
+  const { dx = 0, walking, turning, quarters, eyes, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(s, half)
   const place = isExiting ? 'stand' : placeOf(scene, s)
   const x = place === 'home' ? 0 : strolled(d.walkT, bodyColumns)
   // Which way it came, and which way it goes on: 1 right, -1 left, 0 still
@@ -123,5 +123,14 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
   }
   // Nothing worn over a pose drawn in pixels: what it wears follows the cells
   const head = scene.coversHead || drawn ? undefined : headOf(p.frame)
-  return { ...p, x: x + dx, isWorking: d.id === 'celebrate' || c.isWorking, head, ...(drawn ? { quarters: drawn } : {}) }
+  // The eyes go with the scene's own drawing, not a step or a half turn in its place
+  const hasOwn = drawn !== undefined && !walking && !turning
+  return {
+    ...p,
+    x: x + dx,
+    isWorking: d.id === 'celebrate' || c.isWorking,
+    head,
+    ...(drawn ? { quarters: drawn } : {}),
+    ...(hasOwn && eyes ? { eyes } : {}),
+  }
 }

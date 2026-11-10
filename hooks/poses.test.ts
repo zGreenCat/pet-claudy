@@ -1,9 +1,10 @@
 import { test, expect } from 'claude-code/testing'
 
-import { SCENES, mirrored } from './clawd'
+import { CELEBRATE_TICKS, SCENES, mirrored } from './clawd'
 import type { Context, View } from './clawd'
-import { pose, start, step } from './director'
-import { COFFEE, HALF_TURN, IDLE, MUSIC, READ, SMOKE, WALK, loopTicks, shotAt } from './poses'
+import { solo } from './desks'
+import { cue, pose, start, step } from './director'
+import { CHEER, COFFEE, HALF_TURN, IDLE, MUSIC, READ, SLEEP, SMOKE, WALK, loopTicks, shotAt } from './poses'
 import type { Shot } from './poses'
 
 const COLORS = new Set([...'ODKNPWBUMEYSR.'])
@@ -15,6 +16,8 @@ const ALL: [string, readonly Shot[]][] = [
   ['music', MUSIC],
   ['coffee', COFFEE],
   ['smoke', SMOKE],
+  ['cheer', CHEER],
+  ['sleep', SLEEP],
 ]
 
 test('every drawing is the workshop size, in known colors, and fits the terminal cells', () => {
@@ -86,4 +89,43 @@ test('stopped where it walked to, Clawd reads facing the way it came', () => {
     }
   }
   expect(shown?.quarters).toEqual(mirrored(READ[0]!.px))
+})
+
+test('the cheer lasts as long as the cells cheer, its eyes smiling only through the jump', () => {
+  expect(loopTicks(CHEER)).toBe(CELEBRATE_TICKS)
+  expect(CHEER[0]!.eyes).toBeUndefined()
+  expect(CHEER.at(-1)!.eyes).toBeUndefined()
+  expect(CHEER.some(shot => shot.eyes === 'joy')).toBe(true)
+  expect(SLEEP.every(shot => shot.eyes === 'shut')).toBe(true)
+  // Every shot with eyes has an eye to draw them on
+  for (const shot of [...CHEER, ...SLEEP]) if (shot.eyes) expect(shot.px.some(row => row.includes('K'))).toBe(true)
+})
+
+test('the eyes draw as glyphs on the body, and the line stays clear of the drawing', () => {
+  const text = (rows: ReturnType<typeof solo>) => rows.map(row => row.map(seg => seg.text).join(''))
+  const joy = CHEER.find(shot => shot.eyes === 'joy' && shot.px[2]!.endsWith('O'))!
+  const rows = text(solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 4, '¡listo!', true, 80, undefined, joy.px, 'joy'))
+  expect(rows.join('').split('^').length - 1).toBe(2)
+  // The drawing reaches its last cell, 4 + POSE_DX + 11; the line starts past it
+  expect(rows[2]!.indexOf('¡listo!')).toBeGreaterThan(4 - 2 + 11)
+  const asleep = text(solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'zzz', false, 80, undefined, SLEEP[0]!.px, 'shut'))
+  expect(asleep.join('').split('▁').length - 1).toBe(2)
+})
+
+test('the director shows the cheer drawn, smiling mid-jump, and sleep with its eyes shut', () => {
+  const idle: Context = { idleTicks: 0, isWorking: false }
+  let d = cue(start(0), 'celebrate', 0)
+  const eyes = new Set<string | undefined>()
+  for (let t = 0; t < CELEBRATE_TICKS; t++) {
+    d = step(d, idle, t)
+    const v = pose(d, idle, t, 80)
+    expect(v.quarters).toBeDefined()
+    eyes.add(v.eyes)
+  }
+  expect([...eyes].sort()).toEqual(['joy', undefined].sort())
+  const asleep: Context = { idleTicks: 10_000, isWorking: false }
+  let z = start(0)
+  z = step(z, asleep, 1)
+  const v = pose(z, asleep, 1, 80)
+  expect([v.line, v.eyes, v.quarters !== undefined]).toEqual(['zzz', 'shut', true])
 })

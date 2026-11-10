@@ -4,7 +4,7 @@
 //   node scripts/preview.ts todos    plays them in turn
 // Ctrl+C stops it. Not part of the mod: the engine loads only hooks/.
 
-import { CELEBRATE_TICKS, MOMENT_TICKS, SCENES, SLEEP_AFTER_TICKS, WIDTH, view } from '../hooks/clawd.ts'
+import { CELEBRATE_TICKS, MOMENT_TICKS, SCENES, WIDTH, view } from '../hooks/clawd.ts'
 import type { Context, Frame, SceneId, View } from '../hooks/clawd.ts'
 import { HAT, dress } from '../hooks/accessories.ts'
 import { cue, pose, start, step } from '../hooks/director.ts'
@@ -95,9 +95,9 @@ const MOODS: Mood[] = [
   { name: 'quieto', about: 'esperando: parpadea y se balancea', at: scened('idle') },
   { name: 'baila', about: 'trabajando: baila y camina ("pensando", "trabajando", "bailando")', at: (t, c) => view(t % 72, 0, true, c) },
   { name: 'cocina', about: 'trabajando, "cocinando código": tira código al aire en una sartén', at: (t, c) => view(72 + (t % 24), 0, true, c) },
-  { name: 'celebra', about: 'terminó un turno: salta con los brazos arriba, confeti y "¡listo!"', at: (t, c) => view(t, 0, false, c, t % CELEBRATE_TICKS) },
+  { name: 'celebra', about: 'terminó un turno: salta en diagonal sonriendo (^ ^), gira en el aire, confeti y "¡listo!"', at: t => scened('celebrate')(t % CELEBRATE_TICKS) },
   { name: 'fuma', about: 'un rato sin usarlo: un break con cigarro, de vez en cuando', at: scened('smoke') },
-  { name: 'duerme', about: '3 minutos sin usarlo: zzz, sin animación', at: (t, c) => view(t, SLEEP_AFTER_TICKS, false, c) },
+  { name: 'duerme', about: '3 minutos sin usarlo: ojos cerrados (▁ ▁), respira y suben las Z', at: scened('sleep') },
   { name: 'cool', about: 'pasan los tests o sale un commit: lentes de sol', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'cool', since: t % MOMENT_TICKS.cool }) },
   { name: 'cariño', about: 'le dices gracias: un corazón sobre su mano', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'love', since: t % MOMENT_TICKS.love }) },
   { name: 'idea', about: 'termina un plan: se le prende el foco', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'idea', since: t % MOMENT_TICKS.idea }) },
@@ -184,7 +184,7 @@ const timer = setInterval(() => {
   if (mood.at) {
     const k = arg === 'todos' ? t % HOLD : t
     const v = mood.at(k, columns())
-    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns(), mood.decor?.(k), v.quarters))
+    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns(), mood.decor?.(k), v.quarters, v.eyes))
     t += 1
     return
   }

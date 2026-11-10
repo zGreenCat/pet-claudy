@@ -4,6 +4,8 @@
 // agent list, so the timer can tell whether the drawing changed and the tests
 // can drive it.
 
+import type { Eyes } from './poses.ts'
+
 export type Agent = {
   id: string
   type: string
@@ -340,8 +342,10 @@ const PIXEL_ORDER = Object.values(PIXEL)
 // A sprite of two pixel rows and two pixel columns per cell. A cell all one
 // color is its background, so whole cells leave no seam; a full cell of two
 // is the commoner one behind a glyph of the other; a cell with empty pixels
-// is a glyph alone, in its rarest color
-function paintQuarters(rows: Cell[][], top: number, x: number, sprite: string[]) {
+// is a glyph alone, in its rarest color. With `eyes`, a cell with an eye in
+// it is that glyph instead, dark on the body: a smile or a shut eye
+const EYE_GLYPH: Record<Eyes, string> = { joy: '^', shut: '▁' }
+function paintQuarters(rows: Cell[][], top: number, x: number, sprite: string[], eyes?: Eyes) {
   const width = Math.ceil(Math.max(...sprite.map(s => s.length)) / 2)
   for (let r = 0; r * 2 < sprite.length; r++) {
     const row = rows[top + r]!
@@ -357,6 +361,10 @@ function paintQuarters(rows: Cell[][], top: number, x: number, sprite: string[])
         (a, b) => count(a) - count(b) || PIXEL_ORDER.indexOf(b) - PIXEL_ORDER.indexOf(a),
       )
       if (colors.length === 0) continue
+      if (eyes && px.includes(EYE_COLOR)) {
+        row[x + i] = { ch: EYE_GLYPH[eyes], style: { fg: EYE_COLOR, bg: PIXEL.O! } }
+        continue
+      }
       const isFull = px.every(p => p !== undefined)
       if (colors.length === 1 && isFull) {
         row[x + i] = { ch: ' ', style: { bg: colors[0]! } }
@@ -511,15 +519,17 @@ export function solo(
   // The pose in pixels, two to a cell each way over the band's rows, drawn in
   // place of the frame
   quarters?: readonly string[],
+  eyes?: Eyes,
 ): Segment[][] {
   const width = Math.max(1, bodyColumns)
   const rows: Cell[][] = Array.from({ length: ROWS }, () =>
     Array.from({ length: width }, () => ({ ch: ' ', style: NONE })),
   )
-  if (quarters) paintQuarters(rows, 0, x + POSE_DX, [...quarters])
+  if (quarters) paintQuarters(rows, 0, x + POSE_DX, [...quarters], eyes)
   else frame.forEach((sprite, i) => paintCells(rows[i + 1]!, x, sprite))
   for (const m of marks) put(rows[m.row]!, x + m.x, m.text, { fg: m.fg, ...(m.bg ? { bg: m.bg } : {}) })
-  const spriteWidth = Math.max(...frame.map(r => r.length))
+  // Past the whole drawing when there is one: it can reach its last cell
+  const spriteWidth = quarters ? POSE_DX + Math.ceil(quarters[0]!.length / 2) : Math.max(...frame.map(r => r.length))
   put(rows[2]!, x + spriteWidth + 1, line, { fg: 'claude', dim: !isWorking, italic: true })
   stand(rows, decor)
   return rows.map(segments)
