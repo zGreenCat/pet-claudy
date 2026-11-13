@@ -11,7 +11,16 @@
 // puff): its scene does not give way during it. `eyes` draws each eye's cell
 // as a glyph the pixels cannot: smiling (^) or shut (▁)
 export type Eyes = 'joy' | 'shut'
-export type Shot = { ticks: number; px: readonly string[]; busy?: true; eyes?: Eyes }
+// One cell of a drawing on a grid of its own, over the drawing's pixels: `x`
+// and `y` count cells, and `px` are the cell's pixels on that grid. Quarters
+// are two rows of two: what keeps an eye half a cell tall in a drawing whose
+// other cells are sextants
+export type GridCell = { x: number; y: number; grid: 'quarters'; px: readonly string[] }
+export type Shot = { ticks: number; px: readonly string[]; busy?: true; eyes?: Eyes; cells?: readonly GridCell[] }
+
+// The cells of a drawing mirrored with it, `columns` cells wide
+export const mirroredCells = (cells: readonly GridCell[], columns = 12): GridCell[] =>
+  cells.map(cell => ({ ...cell, x: columns - 1 - cell.x, px: cell.px.map(row => [...row].reverse().join('')) }))
 
 // The ticks one pass of a loop of shots takes
 export const loopTicks = (shots: readonly Shot[]) => shots.reduce((n, shot) => n + shot.ticks, 0)
@@ -891,9 +900,10 @@ export const SLEEP: readonly Shot[] = [
 // The same Clawd drawn taller, for the terminals that draw sextants: 24
 // pixels across by 12 down, three rows to a cell, so each pixel is nearly
 // square. A drawing's row count says which grid paints it. The underside is
-// shaded, a blink is the eye's lower pixel, and a lifted leg is a pixel short.
-// 1, 2 and 3 blend the body into its shade, a quarter, a half and three
-// quarters of the way: a blend fills its whole cell
+// shaded, and a lifted leg is a pixel short. The eyes are cells in quarters,
+// half a cell tall as ever; a blink is the sextant under them. 1, 2 and 3
+// blend the body into its shade, a quarter, a half and three quarters of the
+// way: a blend fills its whole cell
 export const TALL_WALK: readonly Shot[] = [
   // paso 1
   {
@@ -903,14 +913,18 @@ export const TALL_WALK: readonly Shot[] = [
       '........................',
       '........................',
       '.....D2211OOOOOOOO......',
-      '.....D2211KOOOOOKO......',
-      '.....D2211KOOOOOKO......',
+      '.....D2211OOOOOOOO......',
+      '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211DDDDDDDD......',
       '.....D.O.O.OD.O.O.......',
       '.......O...O..O.........',
       '........................',
+    ],
+    cells: [
+      { x: 5, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 8, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
     ],
   },
   // paso 2
@@ -921,14 +935,18 @@ export const TALL_WALK: readonly Shot[] = [
       '........................',
       '........................',
       '.....D2211OOOOOOOO......',
-      '.....D2211KOOOOOKO......',
-      '.....D2211KOOOOOKO......',
+      '.....D2211OOOOOOOO......',
+      '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211DDDDDDDD......',
       '.....DO.O.O..DO.O.......',
       '.....DO.O.O..DO.O.......',
       '........................',
+    ],
+    cells: [
+      { x: 5, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 8, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
     ],
   },
   // paso 3
@@ -939,14 +957,18 @@ export const TALL_WALK: readonly Shot[] = [
       '........................',
       '........................',
       '.....D2211OOOOOOOO......',
-      '.....D2211KOOOOOKO......',
-      '.....D2211KOOOOOKO......',
+      '.....D2211OOOOOOOO......',
+      '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211DDDDDDDD......',
       '......D.O.O..D.O.O......',
       '......D...O..D...O......',
       '........................',
+    ],
+    cells: [
+      { x: 5, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 8, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
     ],
   },
   // paso 4
@@ -957,8 +979,8 @@ export const TALL_WALK: readonly Shot[] = [
       '........................',
       '........................',
       '.....D2211OOOOOOOO......',
-      '.....D2211KOOOOOKO......',
-      '.....D2211KOOOOOKO......',
+      '.....D2211OOOOOOOO......',
+      '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211DDDDDDDD......',
@@ -966,23 +988,34 @@ export const TALL_WALK: readonly Shot[] = [
       '.....D...D..D..O........',
       '........................',
     ],
+    cells: [
+      { x: 5, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 8, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+    ],
   },
 ]
 
-export const TALL_HALF_TURN: readonly string[] = [
-  '........................',
-  '........................',
-  '........................',
-  '.....D11OOOOOOOOOO......',
-  '.....D11OKOOOOOKOO......',
-  '.....D11OKOOOOOKOO......',
-  '.....D11OOOOOOOOOOO.....',
-  '.....D11OOOOOOOOOOO.....',
-  '.....D11DDDDDDDDDD......',
-  '.....D.O.O.....O.O......',
-  '.....D.O.O.....O.O......',
-  '........................',
-]
+export const TALL_HALF_TURN: Shot = {
+  ticks: 1,
+  px: [
+    '........................',
+    '........................',
+    '........................',
+    '.....D11OOOOOOOOOO......',
+    '.....D11OOOOOOOOOO......',
+    '.....D11OOOOOOOOOO......',
+    '.....D11OOOOOOOOOOO.....',
+    '.....D11OOOOOOOOOOO.....',
+    '.....D11DDDDDDDDDD......',
+    '.....D.O.O.....O.O......',
+    '.....D.O.O.....O.O......',
+    '........................',
+  ],
+  cells: [
+    { x: 4, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
+    { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
+  ],
+}
 
 export const TALL_IDLE: readonly Shot[] = [
   // quieto
@@ -993,14 +1026,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '......OOOOOOOOOOOO......',
-      '......OOKOOOOOOKOO......',
-      '......OOKOOOOOOKOO......',
+      '......OOOOOOOOOOOO......',
+      '......OOOOOOOOOOOO......',
       '....OOOOOOOOOOOOOOOO....',
       '....OOOOOOOOOOOOOOOO....',
       '......DDDDDDDDDDDD......',
       '......O.O......O.O......',
       '......O.O......O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
   // inhala
@@ -1010,8 +1047,8 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '......OOOOOOOOOOOO......',
-      '......OOKOOOOOOKOO......',
-      '......OOKOOOOOOKOO......',
+      '......OOOOOOOOOOOO......',
+      '......OOOOOOOOOOOO......',
       '......OOOOOOOOOOOO......',
       '....OOOOOOOOOOOOOOOO....',
       '....OOOOOOOOOOOOOOOO....',
@@ -1019,6 +1056,10 @@ export const TALL_IDLE: readonly Shot[] = [
       '......O.O......O.O......',
       '......O.O......O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
   // quieto
@@ -1029,14 +1070,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '......OOOOOOOOOOOO......',
-      '......OOKOOOOOOKOO......',
-      '......OOKOOOOOOKOO......',
+      '......OOOOOOOOOOOO......',
+      '......OOOOOOOOOOOO......',
       '....OOOOOOOOOOOOOOOO....',
       '....OOOOOOOOOOOOOOOO....',
       '......DDDDDDDDDDDD......',
       '......O.O......O.O......',
       '......O.O......O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
   // parpadea
@@ -1065,14 +1110,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '......OOOOOOOOOOOO......',
-      '......OOKOOOOOOKOO......',
-      '......OOKOOOOOOKOO......',
+      '......OOOOOOOOOOOO......',
+      '......OOOOOOOOOOOO......',
       '....OOOOOOOOOOOOOOOO....',
       '....OOOOOOOOOOOOOOOO....',
       '......DDDDDDDDDDDD......',
       '......O.O......O.O......',
       '......O.O......O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
   // inhala
@@ -1082,8 +1131,8 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '......OOOOOOOOOOOO......',
-      '......OOKOOOOOOKOO......',
-      '......OOKOOOOOOKOO......',
+      '......OOOOOOOOOOOO......',
+      '......OOOOOOOOOOOO......',
       '......OOOOOOOOOOOO......',
       '....OOOOOOOOOOOOOOOO....',
       '....OOOOOOOOOOOOOOOO....',
@@ -1091,6 +1140,10 @@ export const TALL_IDLE: readonly Shot[] = [
       '......O.O......O.O......',
       '......O.O......O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
   // medio giro
@@ -1101,14 +1154,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '.....D11OOOOOOOOOO......',
-      '.....D11OKOOOOOKOO......',
-      '.....D11OKOOOOOKOO......',
+      '.....D11OOOOOOOOOO......',
+      '.....D11OOOOOOOOOO......',
       '.....D11OOOOOOOOOOO.....',
       '.....D11OOOOOOOOOOO.....',
       '.....D11DDDDDDDDDD......',
       '.....D.O.O.....O.O......',
       '.....D.O.O.....O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
   // mira al lado
@@ -1119,14 +1176,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '.....D2211OOOOOOOO......',
-      '.....D2211KOOOOOKO......',
-      '.....D2211KOOOOOKO......',
+      '.....D2211OOOOOOOO......',
+      '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211DDDDDDDD......',
       '.....DO.O.O..DO.O.......',
       '.....DO.O.O..DO.O.......',
       '........................',
+    ],
+    cells: [
+      { x: 5, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 8, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
     ],
   },
   // parpadea de lado
@@ -1155,14 +1216,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '.....D2211OOOOOOOO......',
-      '.....D2211KOOOOOKO......',
-      '.....D2211KOOOOOKO......',
+      '.....D2211OOOOOOOO......',
+      '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211OOOOOOOO......',
       '.....D2211DDDDDDDD......',
       '.....DO.O.O..DO.O.......',
       '.....DO.O.O..DO.O.......',
       '........................',
+    ],
+    cells: [
+      { x: 5, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 8, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
     ],
   },
   // medio giro
@@ -1173,14 +1238,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '.....D11OOOOOOOOOO......',
-      '.....D11OKOOOOOKOO......',
-      '.....D11OKOOOOOKOO......',
+      '.....D11OOOOOOOOOO......',
+      '.....D11OOOOOOOOOO......',
       '.....D11OOOOOOOOOOO.....',
       '.....D11OOOOOOOOOOO.....',
       '.....D11DDDDDDDDDD......',
       '.....D.O.O.....O.O......',
       '.....D.O.O.....O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
   // quieto
@@ -1191,14 +1260,18 @@ export const TALL_IDLE: readonly Shot[] = [
       '........................',
       '........................',
       '......OOOOOOOOOOOO......',
-      '......OOKOOOOOOKOO......',
-      '......OOKOOOOOOKOO......',
+      '......OOOOOOOOOOOO......',
+      '......OOOOOOOOOOOO......',
       '....OOOOOOOOOOOOOOOO....',
       '....OOOOOOOOOOOOOOOO....',
       '......DDDDDDDDDDDD......',
       '......O.O......O.O......',
       '......O.O......O.O......',
       '........................',
+    ],
+    cells: [
+      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
     ],
   },
 ]

@@ -18,6 +18,7 @@ import {
   TALL_WALK,
   WALK,
   loopTicks,
+  mirroredCells,
   shotAt,
 } from './poses'
 import type { Shot } from './poses'
@@ -146,7 +147,7 @@ test('the director shows the cheer drawn, smiling mid-jump, and sleep with its e
 })
 
 test('the tall drawings are twelve rows, three to a cell, and fit the cells as sextants', () => {
-  const tall: readonly Shot[] = [...TALL_WALK, ...TALL_IDLE, { ticks: 1, px: TALL_HALF_TURN }]
+  const tall: readonly Shot[] = [...TALL_WALK, ...TALL_IDLE, TALL_HALF_TURN]
   expect(loopTicks(TALL_IDLE)).toBe(loopTicks(IDLE))
   for (const { px } of tall) {
     expect(px.length).toBe(12)
@@ -172,12 +173,42 @@ test('a cell filled with a blend is a shade glyph of the body and its shade', ()
 })
 
 test('a drawing of twelve rows is painted in sextants over the same four rows', () => {
-  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'hola', false, 80, undefined, TALL_IDLE[0]!.px)
+  const blink = TALL_IDLE.find(shot => !shot.cells && shot.px.some(row => row.includes('K')))!
+  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'hola', false, 80, undefined, blink.px)
   expect(rows.length).toBe(4)
   const text = rows.map(row => row.map(seg => seg.text).join(''))
-  // Each eye is two thirds of a column of its cell: the left one's left, the right one's right
-  expect(rows[1]!.filter(seg => seg.style.fg === '#1A1A1A').map(seg => seg.text)).toEqual(['🬓', '🬦'])
+  // A blink is the lowest third of a column of the eye's cell
+  expect(rows[1]!.filter(seg => seg.style.fg === '#1A1A1A').map(seg => seg.text)).toEqual(['🬏', '🬞'])
   // The legs stand in the last row's upper two thirds; no quarter block is used for them
   expect(text[3]).toContain('🬉')
   expect(text.join('')).not.toMatch(/[▘▝▖▗]/)
+})
+
+test('a cell on its own grid is painted in quarters over the sextants: the eyes, half a cell tall', () => {
+  const open = TALL_IDLE[0]!
+  expect(open.cells?.length).toBe(2)
+  // Every such cell sits on the drawing and fits the terminal's rule
+  for (const shot of [...TALL_WALK, ...TALL_IDLE, TALL_HALF_TURN]) {
+    for (const cell of shot.cells ?? []) {
+      expect(cell.x >= 0 && cell.x < 12 && cell.y >= 0 && cell.y < 4).toBe(true)
+      expect(cell.px.map(row => row.length)).toEqual([2, 2])
+      const px = cell.px.join('')
+      expect(new Set([...px].filter(c => c !== '.')).size <= (px.includes('.') ? 1 : 2)).toBe(true)
+    }
+  }
+  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'hola', false, 80, undefined, open.px, undefined, open.cells)
+  const eyes = rows[1]!.filter(seg => seg.style.fg === '#1A1A1A')
+  expect(eyes.map(seg => seg.text)).toEqual(['▖', '▗'])
+  for (const eye of eyes) expect(eye.style.bg).toBe('claude')
+  // Without them the cells are plain body
+  const bare = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'hola', false, 80, undefined, open.px)
+  expect(bare[1]!.some(seg => seg.style.fg === '#1A1A1A')).toBe(false)
+})
+
+test('cells on their own grids turn with the drawing', () => {
+  expect(mirroredCells([{ x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] }])).toEqual([{ x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] }])
+  // Reading where it walked to the left, a scene's cells are mirrored with its drawing
+  const side = TALL_IDLE.find(shot => shot.px.some(row => row.includes('2')))!
+  const turned = mirroredCells(side.cells!)
+  expect(turned.map(cell => cell.x).sort((a, b) => a - b)).toEqual(side.cells!.map(cell => 11 - cell.x).sort((a, b) => a - b))
 })

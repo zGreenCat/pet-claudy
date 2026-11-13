@@ -4,7 +4,7 @@
 
 import type { Mark } from './desks'
 import { CHEER, COFFEE, HALF_TURN, IDLE as WAITING, MUSIC, READ, SLEEP, SMOKE, WALK, shotAt } from './poses.ts'
-import type { Eyes, Shot } from './poses.ts'
+import type { Eyes, GridCell, Shot } from './poses.ts'
 
 export const TICK_MS = 250
 export const WIDTH = 8
@@ -191,6 +191,7 @@ export type View = {
   head?: Head
   quarters?: readonly string[]
   eyes?: Eyes
+  cells?: readonly GridCell[]
 }
 
 // The head of a pose, read off its frame, so no pose has to say: legs in the
@@ -596,6 +597,7 @@ export type Pose = {
   dx?: number
   quarters?: readonly string[]
   eyes?: Eyes
+  cells?: readonly GridCell[]
   walking?: boolean
   turning?: 'in' | 'out'
 }
@@ -624,8 +626,8 @@ export type Scene = {
 // that stands in for it where only cells will do (the desks)
 function drawn(shots: readonly Shot[], line: string, frame: Frame = IDLE) {
   return (s: number): Pose => {
-    const { px, eyes } = shotAt(shots, s)
-    return { frame, marks: [], line, quarters: px, ...(eyes ? { eyes } : {}) }
+    const { px, eyes, cells } = shotAt(shots, s)
+    return { frame, marks: [], line, quarters: px, ...(eyes ? { eyes } : {}), ...(cells ? { cells } : {}) }
   }
 }
 
@@ -702,5 +704,5 @@ export function want(c: Context): SceneId {
 }
 
 export function viewKey(v: View): string {
-  return `${v.frame.join('|')}#${v.quarters?.join('|') ?? ''}#${v.eyes ?? ''}#${v.x}#${v.line}#${JSON.stringify(v.marks)}`
+  return `${v.frame.join('|')}#${v.quarters?.join('|') ?? ''}#${v.eyes ?? ''}#${v.cells ? JSON.stringify(v.cells) : ''}#${v.x}#${v.line}#${JSON.stringify(v.marks)}`
 }

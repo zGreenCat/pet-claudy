@@ -11,7 +11,8 @@ import { cue, pose, start, step } from '../hooks/director.ts'
 import type { Cue } from '../hooks/director.ts'
 import { ROWS, START_X, scene, solo, walk } from '../hooks/desks.ts'
 import type { Agent, Decor, Segment } from '../hooks/desks.ts'
-import { HALF_TURN, IDLE, TALL_HALF_TURN, TALL_IDLE, TALL_WALK, WALK, loopTicks, shotAt } from '../hooks/poses.ts'
+import { HALF_TURN, IDLE, TALL_HALF_TURN, TALL_IDLE, TALL_WALK, WALK, loopTicks, mirroredCells, shotAt } from '../hooks/poses.ts'
+import type { Shot } from '../hooks/poses.ts'
 import { TREE_W, treeCells } from '../hooks/tree.ts'
 
 const TICK_MS = 250
@@ -83,22 +84,23 @@ function trial(h: number): View {
   const isTall = Math.floor(h / part) % 2 === 0
   const k = h % part
   const frame: Frame = ['.OLOORO.', '^OOOOOO^', '.aa..bb.']
-  const shown = (x: number, quarters: readonly string[]): View => ({
+  const shown = (x: number, shot: Shot, isMirrored = false): View => ({
     frame,
     marks: [],
     isWorking: true,
     x,
     line: isTall ? 'sextantes · 24×12' : 'cuartos · 24×8',
-    quarters,
+    quarters: isMirrored ? mirrored(shot.px) : shot.px,
+    ...(shot.cells ? { cells: isMirrored ? mirroredCells(shot.cells) : shot.cells } : {}),
   })
-  if (k >= TRIAL_WALK) return shown(0, shotAt(isTall ? TALL_IDLE : IDLE, Math.floor((k - TRIAL_WALK) / 2)).px)
+  if (k >= TRIAL_WALK) return shown(0, shotAt(isTall ? TALL_IDLE : IDLE, Math.floor((k - TRIAL_WALK) / 2)))
   // Out, a half turn at the far end, back, and a half turn home
-  const turn = isTall ? TALL_HALF_TURN : HALF_TURN
+  const turn: Shot = isTall ? TALL_HALF_TURN : { ticks: 1, px: HALF_TURN }
   if (k === TRIAL_SPAN) return shown(TRIAL_SPAN, turn)
-  if (k === TRIAL_WALK - 1) return shown(0, mirrored(turn))
+  if (k === TRIAL_WALK - 1) return shown(0, turn, true)
   const steps = isTall ? TALL_WALK : WALK
-  const px = steps[k % steps.length]!.px
-  return k > TRIAL_SPAN ? shown(TRIAL_WALK - 1 - k, mirrored(px)) : shown(k, px)
+  const shot = steps[k % steps.length]!
+  return k > TRIAL_SPAN ? shown(TRIAL_WALK - 1 - k, shot, true) : shown(k, shot)
 }
 
 function directed(t: number, columns: number): View {
@@ -214,7 +216,7 @@ const timer = setInterval(() => {
   if (mood.at) {
     const k = arg === 'todos' ? t % HOLD : t
     const v = mood.at(k, columns())
-    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns(), mood.decor?.(k), v.quarters, v.eyes))
+    draw(mood, solo(v.frame, v.marks, v.x, v.line, v.isWorking, columns(), mood.decor?.(k), v.quarters, v.eyes, v.cells))
     t += 1
     return
   }

@@ -5,6 +5,7 @@
 
 import { HALF_TURN, SCENES, headOf, mirrored, strolled, want } from './clawd.ts'
 import type { Context, Mood, Place, Scene, SceneId, View } from './clawd.ts'
+import { mirroredCells } from './poses.ts'
 
 // What arrives from outside: a moment, or a turn that answered
 export type Cue = 'celebrate' | Mood
@@ -102,7 +103,7 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
   const scene = SCENES[d.id]
   const isExiting = d.exitFrom !== undefined
   const s = d.offset + t - d.from
-  const { dx = 0, walking, turning, quarters, eyes, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(s, half)
+  const { dx = 0, walking, turning, quarters, eyes, cells, ...p } = isExiting ? scene.exit!.play(t - d.exitFrom!) : scene.play(s, half)
   const place = isExiting ? 'stand' : placeOf(scene, s)
   const x = place === 'home' ? 0 : strolled(d.walkT, bodyColumns)
   // Which way it came, and which way it goes on: 1 right, -1 left, 0 still
@@ -110,9 +111,14 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
   const goes = Math.sign(strolled(d.walkT + 1, bodyColumns) - x)
   const facing = (pixels: readonly string[], way: number) => (way < 0 ? mirrored(pixels) : pixels)
   let drawn = quarters
+  // Whether what shows is the scene's own drawing, and mirrored
+  let isOwn = turning === undefined
+  let isMirrored = false
   if (walking && quarters) {
     const isTurningBack = goes === 0 || (came !== 0 && came !== goes)
     drawn = isTurningBack ? facing(HALF_TURN, half === 0 ? came || goes : goes || came) : facing(quarters, goes)
+    isOwn = !isTurningBack
+    isMirrored = goes < 0
   } else if (turning === 'in') {
     drawn = half === 0 ? facing(HALF_TURN, came || goes) : undefined
   } else if (turning === 'out') {
@@ -120,6 +126,7 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
   } else if (quarters && place !== 'home' && came < 0) {
     // Stopped where it walked to, it keeps facing the way it came
     drawn = mirrored(quarters)
+    isMirrored = true
   }
   // Nothing worn over a pose drawn in pixels: what it wears follows the cells
   const head = scene.coversHead || drawn ? undefined : headOf(p.frame)
@@ -132,5 +139,7 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
     head,
     ...(drawn ? { quarters: drawn } : {}),
     ...(hasOwn && eyes ? { eyes } : {}),
+    // Its cells on their own grids go wherever its own drawing does, turned with it
+    ...(drawn && isOwn && cells ? { cells: isMirrored ? mirroredCells(cells) : cells } : {}),
   }
 }

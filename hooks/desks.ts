@@ -4,7 +4,7 @@
 // agent list, so the timer can tell whether the drawing changed and the tests
 // can drive it.
 
-import type { Eyes } from './poses.ts'
+import type { Eyes, GridCell } from './poses.ts'
 
 export type Agent = {
   id: string
@@ -551,6 +551,8 @@ export function solo(
   // place of the frame
   quarters?: readonly string[],
   eyes?: Eyes,
+  // Cells of the drawing on a grid of their own, painted over it
+  cells?: readonly GridCell[],
 ): Segment[][] {
   const width = Math.max(1, bodyColumns)
   const rows: Cell[][] = Array.from({ length: ROWS }, () =>
@@ -558,6 +560,14 @@ export function solo(
   )
   // Twelve rows over the band's four are three to a cell: sextants
   if (quarters) paintPixels(rows, 0, x + POSE_DX, [...quarters], quarters.length === ROWS * 3 ? 3 : 2, eyes)
+  if (quarters) {
+    for (const cell of cells ?? []) {
+      const at = x + POSE_DX + cell.x
+      if (cell.y < 0 || cell.y >= ROWS || at < 0 || at >= width) continue
+      rows[cell.y]![at] = { ch: ' ', style: NONE }
+      paintPixels(rows, cell.y, at, [...cell.px], 2, eyes)
+    }
+  }
   else frame.forEach((sprite, i) => paintCells(rows[i + 1]!, x, sprite))
   for (const m of marks) put(rows[m.row]!, x + m.x, m.text, { fg: m.fg, ...(m.bg ? { bg: m.bg } : {}) })
   // Past the whole drawing when there is one: it can reach its last cell

@@ -92,7 +92,7 @@ export const register: Register = (on, options) => {
 
   function soloScene(): Segment[][] {
     const v = shown()
-    return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns, decor(), v.quarters, v.eyes)
+    return solo(v.frame, v.marks, v.x, v.line, v.isWorking, bodyColumns, decor(), v.quarters, v.eyes, v.cells)
   }
 
   function desksScene() {
