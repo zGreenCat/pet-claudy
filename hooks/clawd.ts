@@ -3,7 +3,7 @@
 // changed and the tests can drive it.
 
 import type { Mark } from './desks'
-import { CHEER, COFFEE, HALF_TURN, IDLE as WAITING, MUSIC, READ, SLEEP, SMOKE, WALK, shotAt } from './poses.ts'
+import { CHEER, COFFEE, HALF_TURN as TURN, IDLE as WAITING, MUSIC, READ, SLEEP, SMOKE, WALK, shotAt } from './poses.ts'
 import type { Eyes, GridCell, Shot } from './poses.ts'
 
 export const TICK_MS = 250
@@ -130,7 +130,8 @@ const BLINK: Frame = [HEAD_BLINK, BODY, LEGS]
 
 // Walking three-quarters on and half turned, as drawn in the workshop
 export const WALK_STEPS: readonly (readonly string[])[] = WALK.map(shot => shot.px)
-export { HALF_TURN }
+export const HALF_TURN = TURN.px
+export const HALF_TURN_CELLS = TURN.cells ?? []
 
 export const mirrored = (pixels: readonly string[]): string[] => pixels.map(row => [...row].reverse().join(''))
 const COOK: Frame = [HEAD, BODY_PAN, LEGS]
@@ -510,7 +511,8 @@ function working(s: number, half = 0): Pose {
   if (r.phase === 'stop') return dancing(r.danced)
   const { line } = dancing(r.danced)
   if (r.phase === 'turn') return { frame: IDLE, marks: [], line, turning: r.turn }
-  return { frame: IDLE, marks: [], line, quarters: WALK_STEPS[(s * 2 + half) % WALK_STEPS.length]!, walking: true }
+  const stride = WALK[(s * 2 + half) % WALK.length]!
+  return { frame: IDLE, marks: [], line, quarters: stride.px, ...(stride.cells ? { cells: stride.cells } : {}), walking: true }
 }
 
 // Waiting, `s` ticks into it: a blink once every ~4s, a sway every second
@@ -641,7 +643,7 @@ function cheering(s: number): Pose {
 function putAway(line: string): Scene['exit'] {
   return {
     ticks: 2,
-    play: s => (s === 0 ? { frame: IDLE, marks: [], line, quarters: HALF_TURN } : { frame: IDLE, marks: [], line }),
+    play: s => (s === 0 ? { frame: IDLE, marks: [], line, quarters: HALF_TURN, cells: HALF_TURN_CELLS } : { frame: IDLE, marks: [], line }),
   }
 }
 

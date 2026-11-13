@@ -196,7 +196,8 @@ test('a step shows every half tick, mirrored going left, and Clawd swivels where
   // Steps differ between the two halves of a tick
   const walkingAt = first(shown, 1, v => v.quarters !== undefined)
   const halfway = play(start(0), 0, walkingAt, () => WORKING, columns).d
-  expect(pose(halfway, WORKING, walkingAt, columns, 1).quarters).not.toEqual(shown[walkingAt]!.quarters)
+  // The body is the same drawing; the legs, cells in quarters, are what steps
+  expect(pose(halfway, WORKING, walkingAt, columns, 1).cells).not.toEqual(shown[walkingAt]!.cells)
   const facingRight = new Set([...WALK_STEPS, HALF_TURN].map(f => f.join('|')))
   const facingLeft = new Set([...WALK_STEPS, HALF_TURN].map(f => mirrored(f).join('|')))
   let left = 0

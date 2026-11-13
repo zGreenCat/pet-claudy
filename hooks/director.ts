@@ -3,9 +3,10 @@
 // cleanly, a moment or the cheer plays to its end, and the events that come
 // meanwhile wait their turn. Pure: the clock steps it, the tests drive it.
 
-import { HALF_TURN, SCENES, headOf, mirrored, strolled, want } from './clawd.ts'
+import { HALF_TURN, HALF_TURN_CELLS, SCENES, headOf, mirrored, strolled, want } from './clawd.ts'
 import type { Context, Mood, Place, Scene, SceneId, View } from './clawd.ts'
 import { mirroredCells } from './poses.ts'
+import type { GridCell } from './poses.ts'
 
 // What arrives from outside: a moment, or a turn that answered
 export type Cue = 'celebrate' | Mood
@@ -109,25 +110,24 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
   // Which way it came, and which way it goes on: 1 right, -1 left, 0 still
   const came = d.walkT > 0 ? Math.sign(x - strolled(d.walkT - 1, bodyColumns)) : 0
   const goes = Math.sign(strolled(d.walkT + 1, bodyColumns) - x)
-  const facing = (pixels: readonly string[], way: number) => (way < 0 ? mirrored(pixels) : pixels)
-  let drawn = quarters
-  // Whether what shows is the scene's own drawing, and mirrored
-  let isOwn = turning === undefined
-  let isMirrored = false
+  // A drawing and its cells on their own grids, mirrored together going left
+  type Drawn = { px: readonly string[]; cells: readonly GridCell[] } | undefined
+  const facing = (px: readonly string[], own: readonly GridCell[], way: number): Drawn =>
+    way < 0 ? { px: mirrored(px), cells: mirroredCells(own) } : { px, cells: own }
+  const halfTurned = (way: number) => facing(HALF_TURN, HALF_TURN_CELLS, way)
+  let shown: Drawn = quarters ? { px: quarters, cells: cells ?? [] } : undefined
   if (walking && quarters) {
     const isTurningBack = goes === 0 || (came !== 0 && came !== goes)
-    drawn = isTurningBack ? facing(HALF_TURN, half === 0 ? came || goes : goes || came) : facing(quarters, goes)
-    isOwn = !isTurningBack
-    isMirrored = goes < 0
+    shown = isTurningBack ? halfTurned(half === 0 ? came || goes : goes || came) : facing(quarters, cells ?? [], goes)
   } else if (turning === 'in') {
-    drawn = half === 0 ? facing(HALF_TURN, came || goes) : undefined
+    shown = half === 0 ? halfTurned(came || goes) : undefined
   } else if (turning === 'out') {
-    drawn = half === 0 ? undefined : facing(HALF_TURN, goes || came)
+    shown = half === 0 ? undefined : halfTurned(goes || came)
   } else if (quarters && place !== 'home' && came < 0) {
     // Stopped where it walked to, it keeps facing the way it came
-    drawn = mirrored(quarters)
-    isMirrored = true
+    shown = facing(quarters, cells ?? [], -1)
   }
+  const drawn = shown?.px
   // Nothing worn over a pose drawn in pixels: what it wears follows the cells
   const head = scene.coversHead || drawn ? undefined : headOf(p.frame)
   // The eyes go with the scene's own drawing, not a step or a half turn in its place
@@ -139,7 +139,6 @@ export function pose(d: Director, c: Context, t: number, bodyColumns: number, ha
     head,
     ...(drawn ? { quarters: drawn } : {}),
     ...(hasOwn && eyes ? { eyes } : {}),
-    // Its cells on their own grids go wherever its own drawing does, turned with it
-    ...(drawn && isOwn && cells ? { cells: isMirrored ? mirroredCells(cells) : cells } : {}),
+    ...(shown && shown.cells.length ? { cells: shown.cells } : {}),
   }
 }

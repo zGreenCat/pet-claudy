@@ -26,7 +26,7 @@ import type { Shot } from './poses'
 const COLORS = new Set([...'ODKNPWBUMEYSR.'])
 const ALL: [string, readonly Shot[]][] = [
   ['walk', WALK],
-  ['half turn', [{ ticks: 1, px: HALF_TURN }]],
+  ['half turn', [HALF_TURN]],
   ['idle', IDLE],
   ['read', READ],
   ['music', MUSIC],
@@ -38,22 +38,50 @@ const ALL: [string, readonly Shot[]][] = [
 
 test('every drawing is the workshop size, in known colors, and fits the terminal cells', () => {
   for (const [name, shots] of ALL) {
-    for (const { px } of shots) {
-      expect([name, px.length]).toEqual([name, 8])
+    for (const { px, cells = [] } of shots) {
+      expect([name, px.length]).toEqual([name, 12])
       for (const row of px) {
         expect([name, row.length]).toEqual([name, 24])
         for (const c of row) expect([name, COLORS.has(c)]).toEqual([name, true])
       }
-      // Two colors to a full cell, one to a cell part empty
+      // Two colors to a full cell, one to a cell part empty: in sextants, and in the cells kept in quarters
+      const fits = (cell: string[]) => new Set(cell.filter(c => c !== '.')).size <= (cell.includes('.') ? 1 : 2)
       for (let cy = 0; cy < 4; cy++) {
         for (let cx = 0; cx < 12; cx++) {
-          const cell = [px[cy * 2]![cx * 2]!, px[cy * 2]![cx * 2 + 1]!, px[cy * 2 + 1]![cx * 2]!, px[cy * 2 + 1]![cx * 2 + 1]!]
-          const colors = new Set(cell.filter(c => c !== '.'))
-          expect([name, cy, cx, colors.size <= (cell.includes('.') ? 1 : 2)]).toEqual([name, cy, cx, true])
+          const cell = [0, 1, 2].flatMap(k => [px[cy * 3 + k]![cx * 2]!, px[cy * 3 + k]![cx * 2 + 1]!])
+          expect([name, cy, cx, fits(cell)]).toEqual([name, cy, cx, true])
         }
+      }
+      const places = new Set<string>()
+      for (const cell of cells) {
+        expect([name, cell.grid]).toEqual([name, 'quarters'])
+        if (cell.grid !== 'quarters') continue
+        expect([name, cell.px.map(row => row.length)]).toEqual([name, [2, 2]])
+        expect([name, cell.x, cell.y, fits([...cell.px.join('')])]).toEqual([name, cell.x, cell.y, true])
+        // One grid to a cell, and nothing drawn under it
+        expect(places.has(`${cell.x},${cell.y}`)).toBe(false)
+        places.add(`${cell.x},${cell.y}`)
+        const under = [0, 1, 2].flatMap(k => [px[cell.y * 3 + k]![cell.x * 2]!, px[cell.y * 3 + k]![cell.x * 2 + 1]!])
+        expect([name, cell.x, cell.y, under.join('')]).toEqual([name, cell.x, cell.y, '......'])
       }
     }
   }
+})
+
+test('Clawd keeps the shape it had in quarters: a cell is sextants only where its halves were alike', () => {
+  // Front-on and still: the head and body whole cells, the eyes, arms and legs half a cell as ever
+  const front = IDLE[0]!
+  const kept = (front.cells ?? []).map(cell => (cell.grid === 'quarters' ? `${cell.x},${cell.y}:${cell.px.join('/')}` : ''))
+  expect(kept).toEqual([
+    '4,1:OO/KO', '7,1:OO/OK',
+    '2,2:OO/..', '9,2:OO/..',
+    '3,3:O./..', '4,3:O./..', '7,3:.O/..', '8,3:.O/..',
+  ])
+  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'hola', false, 80, undefined, front.px, undefined, front.cells)
+  const text = rows.map(row => row.map(seg => seg.text).join(''))
+  // Not one sextant in it: quarter blocks and whole cells, as it was
+  expect(text.join('')).not.toMatch(/[\u{1FB00}-\u{1FB3B}]/u)
+  expect(text[3]).toContain('▘')
 })
 
 test('a loop of shots plays each for its ticks, then starts over', () => {
@@ -114,17 +142,18 @@ test('the cheer lasts as long as the cells cheer, its eyes smiling only through 
   expect(CHEER.some(shot => shot.eyes === 'joy')).toBe(true)
   expect(SLEEP.every(shot => shot.eyes === 'shut')).toBe(true)
   // Every shot with eyes has an eye to draw them on
-  for (const shot of [...CHEER, ...SLEEP]) if (shot.eyes) expect(shot.px.some(row => row.includes('K'))).toBe(true)
+  const hasEye = (shot: Shot) => (shot.cells ?? []).some(cell => cell.grid === 'quarters' && cell.px.join('').includes('K'))
+  for (const shot of [...CHEER, ...SLEEP]) if (shot.eyes) expect(hasEye(shot)).toBe(true)
 })
 
 test('the eyes draw as glyphs on the body, and the line stays clear of the drawing', () => {
   const text = (rows: ReturnType<typeof solo>) => rows.map(row => row.map(seg => seg.text).join(''))
-  const joy = CHEER.find(shot => shot.eyes === 'joy' && shot.px[2]!.endsWith('O'))!
-  const rows = text(solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 4, '¡listo!', true, 80, undefined, joy.px, 'joy'))
+  const joy = CHEER.find(shot => shot.eyes === 'joy' && shot.cells?.some(cell => cell.x === 11 && cell.y === 1))!
+  const rows = text(solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 4, '¡listo!', true, 80, undefined, joy.px, 'joy', joy.cells))
   expect(rows.join('').split('^').length - 1).toBe(2)
   // The drawing reaches its last cell, 4 + POSE_DX + 11; the line starts past it
   expect(rows[2]!.indexOf('¡listo!')).toBeGreaterThan(4 - 2 + 11)
-  const asleep = text(solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'zzz', false, 80, undefined, SLEEP[0]!.px, 'shut'))
+  const asleep = text(solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'zzz', false, 80, undefined, SLEEP[0]!.px, 'shut', SLEEP[0]!.cells))
   expect(asleep.join('').split('▁').length - 1).toBe(2)
 })
 
@@ -191,6 +220,10 @@ test('a cell on its own grid is painted in quarters over the sextants: the eyes,
   for (const shot of [...TALL_WALK, ...TALL_IDLE, TALL_HALF_TURN]) {
     for (const cell of shot.cells ?? []) {
       expect(cell.x >= 0 && cell.x < 12 && cell.y >= 0 && cell.y < 4).toBe(true)
+      if (cell.grid === 'eighths') {
+        expect(cell.level >= 1 && cell.level <= 7).toBe(true)
+        continue
+      }
       expect(cell.px.map(row => row.length)).toEqual([2, 2])
       const px = cell.px.join('')
       expect(new Set([...px].filter(c => c !== '.')).size <= (px.includes('.') ? 1 : 2)).toBe(true)
@@ -211,4 +244,30 @@ test('cells on their own grids turn with the drawing', () => {
   const side = TALL_IDLE.find(shot => shot.px.some(row => row.includes('2')))!
   const turned = mirroredCells(side.cells!)
   expect(turned.map(cell => cell.x).sort((a, b) => a - b)).toEqual(side.cells!.map(cell => 11 - cell.x).sort((a, b) => a - b))
+})
+
+test('a breath is the top edge of the body rising by eighths, in the air over it', () => {
+  const breaths = TALL_IDLE.filter(shot => shot.cells?.some(cell => cell.grid === 'eighths'))
+  const levels = breaths.map(shot => shot.cells!.find(cell => cell.grid === 'eighths')!).map(cell => (cell.grid === 'eighths' ? cell.level : 0))
+  expect(levels.slice(0, 6)).toEqual([1, 2, 3, 3, 2, 1])
+  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'hola', false, 80, undefined, breaths[2]!.px, undefined, breaths[2]!.cells)
+  // Six cells wide over the body, three eighths up, in its color and over nothing
+  const air = rows[0]!.filter(seg => seg.text.includes('▃'))
+  expect(air.map(seg => seg.text).join('')).toBe('▃▃▃▃▃▃')
+  for (const seg of air) expect([seg.style.fg, seg.style.bg]).toEqual(['claude', undefined])
+})
+
+test('an edge in eighths turns with the drawing, and its ends are a plain cell', () => {
+  expect(mirroredCells([{ x: 0, y: 2, grid: 'eighths', from: 'left', level: 3, color: 'W' }])).toEqual([
+    { x: 11, y: 2, grid: 'eighths', from: 'right', level: 3, color: 'W' },
+  ])
+  const px = Array.from({ length: 12 }, () => '.'.repeat(24))
+  const cell = (level: number, back?: string) =>
+    solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 2, '', false, 80, undefined, px, undefined, [
+      { x: 2, y: 1, grid: 'eighths', from: 'right', level, color: 'W', ...(back ? { back } : {}) },
+    ])[1]!.find(seg => seg.text.trim() !== '' || seg.style.bg !== undefined)
+  expect(cell(2)?.text).toBe('🮇')
+  expect(cell(2, 'O')?.style).toEqual({ fg: '#F2F2F2', bg: 'claude' })
+  expect(cell(8)?.style.bg).toBe('#F2F2F2')
+  expect(cell(0)).toBeUndefined()
 })

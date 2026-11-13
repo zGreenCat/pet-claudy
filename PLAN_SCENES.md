@@ -221,6 +221,34 @@ Dibujados en el taller ("festejo 2" y "dormir") y retocados por la persona.
 - El confeti es de píxeles en las celdas libres de los costados; ya no cae
   lejos a la derecha.
 
+## Grillas por celda (0.20.x)
+
+Una celda de terminal es un carácter con dos colores, pero cada celda puede
+elegir de qué familia es su carácter. Los dibujos de `hooks/poses.ts` son
+ahora de 12 filas (sextantes, dos píxeles a lo ancho y tres a lo alto por
+celda, píxeles casi cuadrados), y cada dibujo puede traer `cells`: celdas con
+grilla propia, pintadas encima.
+
+| Grilla | Qué es | Para qué |
+| --- | --- | --- |
+| sextantes | 2×3 píxeles, la base | lo que Clawd hace a su alrededor: más espacio de acción |
+| `quarters` | 2×2 píxeles | la forma de Clawd tal como era: ojos, brazos y patas de media celda |
+| `eighths` | un borde, lleno desde un lado de a 1/8 | movimiento suave: una respiración, humo, partículas |
+| mezclas `1 2 3` | la celda entera en `░ ▒ ▓` | sombras degradadas entre el cuerpo y su sombra |
+
+- **La forma de Clawd no cambia.** Decisión de la persona: ni patas más
+  largas, ni más alto, ni más ancho. Los dibujos se convirtieron de 8 a 12
+  filas sin cambiar cómo se ven: una celda cuyas dos filas eran iguales pasó a
+  sextantes, y una de mitades distintas quedó en cuartos. Comprobado pintando
+  los 59 dibujos, de frente y espejados, antes y después: idénticos.
+- El espacio nuevo es para los moods donde Clawd hace cosas: objetos, humo,
+  confeti, capa.
+- Los octantes (2×4) y las imágenes reales no pasan por herdr; los triángulos
+  `◢◣◤◥` no llenan la celda. Las cuñas finas sí se dibujan bien: pendientes.
+- `TALL_WALK`, `TALL_HALF_TURN` y `TALL_IDLE` son una muestra que ninguna
+  escena usa: patas de 2/3, panza en sombra, costado degradado y respiración
+  de a octavos. Se ve con `node scripts/preview.ts sextantes`.
+
 ## Ideas anotadas
 
 - **Un entremedio para cambiar de lugar.** Las escenas que van en un sitio

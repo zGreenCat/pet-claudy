@@ -4,7 +4,7 @@
 // agent list, so the timer can tell whether the drawing changed and the tests
 // can drive it.
 
-import type { Eyes, GridCell } from './poses.ts'
+import type { Edge, Eyes, GridCell } from './poses.ts'
 
 export type Agent = {
   id: string
@@ -365,6 +365,23 @@ const BLEND: Record<string, { ch: string; near: string }> = {
   '2': { ch: '▒', near: 'D' },
   '3': { ch: '▓', near: 'D' },
 }
+// A cell filled from one side, by how many eighths: 1 to 7. None is empty
+// and eight the whole cell
+const EIGHTHS: Record<Edge, string> = {
+  bottom: '▁▂▃▄▅▆▇',
+  top: '▔🮂🮃▀🮄🮅🮆',
+  left: '▏▎▍▌▋▊▉',
+  right: '▕🮇🮈▐🮉🮊🮋',
+}
+function eighth(from: Edge, level: number, color: string, back?: string): Cell {
+  const fg = PIXEL[color] ?? PIXEL.O!
+  const bg = back === undefined ? undefined : PIXEL[back]
+  const n = Math.max(0, Math.min(8, Math.round(level)))
+  if (n === 0) return { ch: ' ', style: bg ? { bg } : NONE }
+  if (n === 8) return { ch: ' ', style: { bg: fg } }
+  return { ch: [...EIGHTHS[from]][n - 1]!, style: bg ? { fg, bg } : { fg } }
+}
+
 function paintPixels(rows: Cell[][], top: number, x: number, sprite: string[], tall: 2 | 3, eyes?: Eyes) {
   const width = Math.ceil(Math.max(...sprite.map(s => s.length)) / 2)
   const full = (1 << (tall * 2)) - 1
@@ -564,6 +581,10 @@ export function solo(
     for (const cell of cells ?? []) {
       const at = x + POSE_DX + cell.x
       if (cell.y < 0 || cell.y >= ROWS || at < 0 || at >= width) continue
+      if (cell.grid === 'eighths') {
+        rows[cell.y]![at] = eighth(cell.from, cell.level, cell.color, cell.back)
+        continue
+      }
       rows[cell.y]![at] = { ch: ' ', style: NONE }
       paintPixels(rows, cell.y, at, [...cell.px], 2, eyes)
     }

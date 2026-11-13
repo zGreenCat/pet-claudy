@@ -89,13 +89,13 @@ function trial(h: number): View {
     marks: [],
     isWorking: true,
     x,
-    line: isTall ? 'sextantes · 24×12' : 'cuartos · 24×8',
+    line: isTall ? 'muestra alta' : 'como hoy',
     quarters: isMirrored ? mirrored(shot.px) : shot.px,
     ...(shot.cells ? { cells: isMirrored ? mirroredCells(shot.cells) : shot.cells } : {}),
   })
   if (k >= TRIAL_WALK) return shown(0, shotAt(isTall ? TALL_IDLE : IDLE, Math.floor((k - TRIAL_WALK) / 2)))
   // Out, a half turn at the far end, back, and a half turn home
-  const turn: Shot = isTall ? TALL_HALF_TURN : { ticks: 1, px: HALF_TURN }
+  const turn: Shot = isTall ? TALL_HALF_TURN : HALF_TURN
   if (k === TRIAL_SPAN) return shown(TRIAL_SPAN, turn)
   if (k === TRIAL_WALK - 1) return shown(0, turn, true)
   const steps = isTall ? TALL_WALK : WALK
@@ -139,7 +139,7 @@ const MOODS: Mood[] = [
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: scened('music') },
   { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
   { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
-  { name: 'sextantes', about: 'prueba: Clawd de 12 píxeles de alto en sextantes, y después el de hoy en cuartos', at: trial },
+  { name: 'sextantes', about: 'prueba: la muestra alta (patas largas, sombra degradada, respiración suave), y después el Clawd de hoy', at: trial },
   { name: 'caminata', about: 'trabajando: camina de tres cuartos, gira, se detiene a bailar o cocinar (8 cuadros por segundo)', at: walking },
   {
     name: 'navidad',
