@@ -339,21 +339,48 @@ function paintCells(row: Cell[], x: number, sprite: string) {
 const QUARTERS = ' ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█'
 const PIXEL_ORDER = Object.values(PIXEL)
 
-// A sprite of two pixel rows and two pixel columns per cell. A cell all one
-// color is its background, so whole cells leave no seam; a full cell of two
-// is the commoner one behind a glyph of the other; a cell with empty pixels
-// is a glyph alone, in its rarest color. With `eyes`, a cell with an eye in
-// it is that glyph instead, dark on the body: a smile or a shut eye
+// A cell's sextants as a glyph, by the ones set, row by row from the upper
+// left: 1, 2, 4, 8, 16, 32. The two columns and the whole cell are older
+// glyphs, outside the sextants' block
+function sextant(mask: number): string {
+  if (mask === 0) return ' '
+  if (mask === 63) return '█'
+  if (mask === 21) return '▌'
+  if (mask === 42) return '▐'
+  return String.fromCodePoint(0x1fb00 + mask - 1 - (mask > 21 ? 1 : 0) - (mask > 42 ? 1 : 0))
+}
+
+// A sprite of two pixel columns and `tall` pixel rows per cell: two, drawn
+// in quarter blocks, or three, in sextants. A cell all one color is its
+// background, so whole cells leave no seam; a full cell of two is the
+// commoner one behind a glyph of the other; a cell with empty pixels is a
+// glyph alone, in its rarest color. With `eyes`, a cell with an eye in it is
+// that glyph instead, dark on the body: a smile or a shut eye
 const EYE_GLYPH: Record<Eyes, string> = { joy: '^', shut: '▁' }
-function paintQuarters(rows: Cell[][], top: number, x: number, sprite: string[], eyes?: Eyes) {
+// The body blended into its shade, a quarter, a half and three quarters of
+// the way: 1, 2, 3. A cell filled with one of them is a shade glyph of the
+// two colors; anywhere else the pixel falls back to the nearer color
+const BLEND: Record<string, { ch: string; near: string }> = {
+  '1': { ch: '░', near: 'O' },
+  '2': { ch: '▒', near: 'D' },
+  '3': { ch: '▓', near: 'D' },
+}
+function paintPixels(rows: Cell[][], top: number, x: number, sprite: string[], tall: 2 | 3, eyes?: Eyes) {
   const width = Math.ceil(Math.max(...sprite.map(s => s.length)) / 2)
-  for (let r = 0; r * 2 < sprite.length; r++) {
+  const full = (1 << (tall * 2)) - 1
+  const glyph = (mask: number) => (tall === 2 ? QUARTERS[mask]! : sextant(mask))
+  for (let r = 0; r * tall < sprite.length; r++) {
     const row = rows[top + r]!
-    const upper = sprite[r * 2]!
-    const lower = sprite[r * 2 + 1] ?? ''
+    const lines = Array.from({ length: tall }, (_, k) => sprite[r * tall + k] ?? '')
     for (let i = 0; i < width; i++) {
       if (x + i < 0 || x + i >= row.length) continue
-      const px = [upper[i * 2], upper[i * 2 + 1], lower[i * 2], lower[i * 2 + 1]].map(p => PIXEL[p ?? '.'])
+      const letters = lines.flatMap(line => [line[i * 2] ?? '.', line[i * 2 + 1] ?? '.'])
+      const blend = BLEND[letters[0]!]
+      if (blend && letters.every(p => p === letters[0])) {
+        row[x + i] = { ch: blend.ch, style: { fg: PIXEL.D!, bg: PIXEL.O! } }
+        continue
+      }
+      const px = letters.map(p => PIXEL[BLEND[p]?.near ?? p])
       const mask = (c: string | undefined) => px.reduce((m, p, k) => (p === c ? m | (1 << k) : m), 0)
       const count = (c: string) => px.filter(p => p === c).length
       // Rarest first; a tie goes to the later color in PIXEL
@@ -370,12 +397,16 @@ function paintQuarters(rows: Cell[][], top: number, x: number, sprite: string[],
         row[x + i] = { ch: ' ', style: { bg: colors[0]! } }
       } else if (isFull) {
         const bg = colors[colors.length - 1]!
-        row[x + i] = { ch: QUARTERS[15 - mask(bg)]!, style: { fg: colors[0]!, bg } }
+        row[x + i] = { ch: glyph(full - mask(bg)), style: { fg: colors[0]!, bg } }
       } else {
-        row[x + i] = { ch: QUARTERS[15 - mask(undefined)]!, style: { fg: colors[0]! } }
+        row[x + i] = { ch: glyph(full - mask(undefined)), style: { fg: colors[0]! } }
       }
     }
   }
+}
+
+function paintQuarters(rows: Cell[][], top: number, x: number, sprite: string[], eyes?: Eyes) {
+  paintPixels(rows, top, x, sprite, 2, eyes)
 }
 
 function sameStyle(a: Style, b: Style): boolean {
@@ -525,7 +556,8 @@ export function solo(
   const rows: Cell[][] = Array.from({ length: ROWS }, () =>
     Array.from({ length: width }, () => ({ ch: ' ', style: NONE })),
   )
-  if (quarters) paintQuarters(rows, 0, x + POSE_DX, [...quarters], eyes)
+  // Twelve rows over the band's four are three to a cell: sextants
+  if (quarters) paintPixels(rows, 0, x + POSE_DX, [...quarters], quarters.length === ROWS * 3 ? 3 : 2, eyes)
   else frame.forEach((sprite, i) => paintCells(rows[i + 1]!, x, sprite))
   for (const m of marks) put(rows[m.row]!, x + m.x, m.text, { fg: m.fg, ...(m.bg ? { bg: m.bg } : {}) })
   // Past the whole drawing when there is one: it can reach its last cell

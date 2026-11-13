@@ -4,7 +4,22 @@ import { CELEBRATE_TICKS, SCENES, mirrored } from './clawd'
 import type { Context, View } from './clawd'
 import { solo } from './desks'
 import { cue, pose, start, step } from './director'
-import { CHEER, COFFEE, HALF_TURN, IDLE, MUSIC, READ, SLEEP, SMOKE, WALK, loopTicks, shotAt } from './poses'
+import {
+  CHEER,
+  COFFEE,
+  HALF_TURN,
+  IDLE,
+  MUSIC,
+  READ,
+  SLEEP,
+  SMOKE,
+  TALL_HALF_TURN,
+  TALL_IDLE,
+  TALL_WALK,
+  WALK,
+  loopTicks,
+  shotAt,
+} from './poses'
 import type { Shot } from './poses'
 
 const COLORS = new Set([...'ODKNPWBUMEYSR.'])
@@ -128,4 +143,41 @@ test('the director shows the cheer drawn, smiling mid-jump, and sleep with its e
   z = step(z, asleep, 1)
   const v = pose(z, asleep, 1, 80)
   expect([v.line, v.eyes, v.quarters !== undefined]).toEqual(['zzz', 'shut', true])
+})
+
+test('the tall drawings are twelve rows, three to a cell, and fit the cells as sextants', () => {
+  const tall: readonly Shot[] = [...TALL_WALK, ...TALL_IDLE, { ticks: 1, px: TALL_HALF_TURN }]
+  expect(loopTicks(TALL_IDLE)).toBe(loopTicks(IDLE))
+  for (const { px } of tall) {
+    expect(px.length).toBe(12)
+    for (const row of px) expect(row.length).toBe(24)
+    for (let cy = 0; cy < 4; cy++) {
+      for (let cx = 0; cx < 12; cx++) {
+        const cell = [0, 1, 2].flatMap(k => [px[cy * 3 + k]![cx * 2]!, px[cy * 3 + k]![cx * 2 + 1]!])
+        const colors = new Set(cell.filter(c => c !== '.'))
+        // A blend is the whole cell's; other cells take two colors full, one part empty
+        const fits = cell.some(c => '123'.includes(c)) ? new Set(cell).size === 1 : colors.size <= (cell.includes('.') ? 1 : 2)
+        expect([cy, cx, fits]).toEqual([cy, cx, true])
+      }
+    }
+  }
+})
+
+test('a cell filled with a blend is a shade glyph of the body and its shade', () => {
+  const side = TALL_IDLE.find(shot => shot.px.some(row => row.includes('2')))!
+  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 2, 'hola', false, 80, undefined, side.px)
+  const shades = rows[1]!.filter(seg => /[░▒▓]/.test(seg.text))
+  expect(shades.map(seg => seg.text).join('')).toBe('▒░')
+  for (const seg of shades) expect([seg.style.fg, seg.style.bg]).toEqual(['#A0533A', 'claude'])
+})
+
+test('a drawing of twelve rows is painted in sextants over the same four rows', () => {
+  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 0, 'hola', false, 80, undefined, TALL_IDLE[0]!.px)
+  expect(rows.length).toBe(4)
+  const text = rows.map(row => row.map(seg => seg.text).join(''))
+  // Each eye is two thirds of a column of its cell: the left one's left, the right one's right
+  expect(rows[1]!.filter(seg => seg.style.fg === '#1A1A1A').map(seg => seg.text)).toEqual(['🬓', '🬦'])
+  // The legs stand in the last row's upper two thirds; no quarter block is used for them
+  expect(text[3]).toContain('🬉')
+  expect(text.join('')).not.toMatch(/[▘▝▖▗]/)
 })

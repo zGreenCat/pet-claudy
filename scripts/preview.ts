@@ -4,13 +4,14 @@
 //   node scripts/preview.ts todos    plays them in turn
 // Ctrl+C stops it. Not part of the mod: the engine loads only hooks/.
 
-import { CELEBRATE_TICKS, MOMENT_TICKS, SCENES, WIDTH, view } from '../hooks/clawd.ts'
+import { CELEBRATE_TICKS, MOMENT_TICKS, SCENES, WIDTH, mirrored, view } from '../hooks/clawd.ts'
 import type { Context, Frame, SceneId, View } from '../hooks/clawd.ts'
 import { HAT, dress } from '../hooks/accessories.ts'
 import { cue, pose, start, step } from '../hooks/director.ts'
 import type { Cue } from '../hooks/director.ts'
 import { ROWS, START_X, scene, solo, walk } from '../hooks/desks.ts'
 import type { Agent, Decor, Segment } from '../hooks/desks.ts'
+import { HALF_TURN, IDLE, TALL_HALF_TURN, TALL_IDLE, TALL_WALK, WALK, loopTicks, shotAt } from '../hooks/poses.ts'
 import { TREE_W, treeCells } from '../hooks/tree.ts'
 
 const TICK_MS = 250
@@ -72,6 +73,34 @@ function walking(h: number, columns: number): View {
   return pose(walker, ctx, t, columns, h % 2)
 }
 
+// The trial of sextants: Clawd drawn 12 pixels tall walks a stretch and back,
+// then waits, and after it the same in today's quarters, to set side by side.
+// `h` counts half ticks
+const TRIAL_SPAN = 14
+const TRIAL_WALK = TRIAL_SPAN * 2 + 2
+function trial(h: number): View {
+  const part = TRIAL_WALK + loopTicks(TALL_IDLE) * 2
+  const isTall = Math.floor(h / part) % 2 === 0
+  const k = h % part
+  const frame: Frame = ['.OLOORO.', '^OOOOOO^', '.aa..bb.']
+  const shown = (x: number, quarters: readonly string[]): View => ({
+    frame,
+    marks: [],
+    isWorking: true,
+    x,
+    line: isTall ? 'sextantes · 24×12' : 'cuartos · 24×8',
+    quarters,
+  })
+  if (k >= TRIAL_WALK) return shown(0, shotAt(isTall ? TALL_IDLE : IDLE, Math.floor((k - TRIAL_WALK) / 2)).px)
+  // Out, a half turn at the far end, back, and a half turn home
+  const turn = isTall ? TALL_HALF_TURN : HALF_TURN
+  if (k === TRIAL_SPAN) return shown(TRIAL_SPAN, turn)
+  if (k === TRIAL_WALK - 1) return shown(0, mirrored(turn))
+  const steps = isTall ? TALL_WALK : WALK
+  const px = steps[k % steps.length]!.px
+  return k > TRIAL_SPAN ? shown(TRIAL_WALK - 1 - k, mirrored(px)) : shown(k, px)
+}
+
 function directed(t: number, columns: number): View {
   const ctx = (k: number): Context => ({
     idleTicks: k < 170 ? 0 : k - 170,
@@ -108,6 +137,7 @@ const MOODS: Mood[] = [
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: scened('music') },
   { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
   { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
+  { name: 'sextantes', about: 'prueba: Clawd de 12 píxeles de alto en sextantes, y después el de hoy en cuartos', at: trial },
   { name: 'caminata', about: 'trabajando: camina de tres cuartos, gira, se detiene a bailar o cocinar (8 cuadros por segundo)', at: walking },
   {
     name: 'navidad',
@@ -209,4 +239,4 @@ const timer = setInterval(() => {
     process.stdout.write('\nfin: todos se fueron\n')
   }
   // The walk steps twice a tick; every other mood keeps the plugin's tick
-}, arg === 'caminata' ? TICK_MS / 2 : TICK_MS)
+}, arg === 'caminata' || arg === 'sextantes' ? TICK_MS / 2 : TICK_MS)
