@@ -84,10 +84,11 @@ test("the headphones and the bulb take the hat's place, way out included", () =>
   }
   expect(heads.filter(h => h.startsWith('music')).every(h => h.endsWith('=undefined'))).toBe(true)
   expect(heads.some(h => h.startsWith('music:exit'))).toBe(true)
-  expect(heads[60]).toBe('work=up')
+  // Back at work it is drawn in pixels, and nothing drawn so wears a hat yet
+  expect(heads[60]).toBe('work=undefined')
 
-  // A moment over the hat leaves it on
+  // A moment is drawn in pixels too
   d = cue(start(0), 'cool', 0)
   d = step(d, { idleTicks: 0, isWorking: true }, 0)
-  expect(pose(d, { idleTicks: 0, isWorking: true }, 0, 80).head).toBe('up')
+  expect(pose(d, { idleTicks: 0, isWorking: true }, 0, 80).head).toBeUndefined()
 })

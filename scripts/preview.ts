@@ -11,7 +11,7 @@ import { cue, pose, start, step } from '../hooks/director.ts'
 import type { Cue } from '../hooks/director.ts'
 import { ROWS, START_X, scene, solo, walk } from '../hooks/desks.ts'
 import type { Agent, Decor, Segment } from '../hooks/desks.ts'
-import { HALF_TURN, IDLE, TALL_HALF_TURN, TALL_IDLE, TALL_WALK, WALK, loopTicks, mirroredCells, shotAt } from '../hooks/poses.ts'
+import { COOK, DANCE, HALF_TURN, IDLE, TALL_HALF_TURN, TALL_IDLE, TALL_WALK, WALK, loopTicks, mirroredCells, shotAt } from '../hooks/poses.ts'
 import type { Shot } from '../hooks/poses.ts'
 import { TREE_W, treeCells } from '../hooks/tree.ts'
 
@@ -27,6 +27,21 @@ function scened(id: SceneId) {
   return (t: number): View => {
     const { dx = 0, walking: _w, turning: _t, ...p } = SCENES[id].play(t)
     return { ...p, x: dx, isWorking: false }
+  }
+}
+
+// A loop of drawings on its own, at Clawd's spot
+function looped(shots: readonly Shot[], line: string, t: number): View {
+  const shot = shotAt(shots, t)
+  return {
+    frame: ['.OLOORO.', '^OOOOOO^', '.aa..bb.'],
+    marks: [],
+    x: 0,
+    line,
+    isWorking: true,
+    quarters: shot.px,
+    ...(shot.eyes ? { eyes: shot.eyes } : {}),
+    ...(shot.cells ? { cells: shot.cells } : {}),
   }
 }
 
@@ -124,20 +139,20 @@ function directed(t: number, columns: number): View {
 // pose: it is the desks scene, with its own script below.
 const MOODS: Mood[] = [
   { name: 'quieto', about: 'esperando: parpadea y se balancea', at: scened('idle') },
-  { name: 'baila', about: 'trabajando: baila y camina ("pensando", "trabajando", "bailando")', at: (t, c) => view(t % 72, 0, true, c) },
-  { name: 'cocina', about: 'trabajando, "cocinando código": tira código al aire en una sartén', at: (t, c) => view(72 + (t % 24), 0, true, c) },
+  { name: 'baila', about: 'trabajando, detenido: brazos arriba y abajo, un salto y un giro', at: t => looped(DANCE, 'bailando', t) },
+  { name: 'cocina', about: 'trabajando, "cocinando código": levanta la sartén y tira el código al aire', at: t => looped(COOK, 'cocinando código', t) },
   { name: 'celebra', about: 'terminó un turno: salta en diagonal sonriendo (^ ^), gira en el aire, confeti y "¡listo!"', at: t => scened('celebrate')(t % CELEBRATE_TICKS) },
   { name: 'fuma', about: 'un rato sin usarlo: un break con cigarro, de vez en cuando', at: scened('smoke') },
   { name: 'duerme', about: '3 minutos sin usarlo: ojos cerrados (▁ ▁), respira y suben las Z', at: scened('sleep') },
-  { name: 'cool', about: 'pasan los tests o sale un commit: lentes de sol', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'cool', since: t % MOMENT_TICKS.cool }) },
-  { name: 'cariño', about: 'le dices gracias: un corazón sobre su mano', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'love', since: t % MOMENT_TICKS.love }) },
-  { name: 'idea', about: 'termina un plan: se le prende el foco', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'idea', since: t % MOMENT_TICKS.idea }) },
-  { name: 'magia', about: 'usa una skill: agita la varita y saltan chispas', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'magic', since: t % MOMENT_TICKS.magic }) },
+  { name: 'cool', about: 'pasan los tests o sale un commit: lentes de sol', at: t => scened('cool')(t % MOMENT_TICKS.cool) },
+  { name: 'cariño', about: 'le dices gracias: un corazón sobre su mano', at: t => scened('love')(t % MOMENT_TICKS.love) },
+  { name: 'idea', about: 'termina un plan: se le prende el foco', at: t => scened('idea')(t % MOMENT_TICKS.idea) },
+  { name: 'magia', about: 'usa una skill: agita la varita y saltan chispas', at: t => scened('magic')(t % MOMENT_TICKS.magic) },
   { name: 'lee', about: 'lee varios archivos seguidos: un libro en la mano', at: scened('read') },
-  { name: 'súper', about: 'lanza varios subagentes a la vez: capa y puño arriba', at: (t, c) => view(t, 0, true, c, undefined, { mood: 'super', since: t % MOMENT_TICKS.super }) },
+  { name: 'súper', about: 'lanza varios subagentes a la vez: capa y puño arriba', at: t => scened('super')(t % MOMENT_TICKS.super) },
   { name: 'café', about: 'un rato sin usarlo, otro break: una taza de café', at: scened('coffee') },
   { name: 'música', about: 'espera un comando largo: audífonos y notas', at: scened('music') },
-  { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: (t, c) => view(t, 0, false, c, undefined, { mood: 'dizzy', since: t % MOMENT_TICKS.dizzy }) },
+  { name: 'mareado', about: 'fallan varias cosas seguidas: ojos en espiral y estrellas', at: t => scened('dizzy')(t % MOMENT_TICKS.dizzy) },
   { name: 'cambios', about: 'un turno inventado: lee, dos momentos en cola, música y festejo, sin cortes', at: (t, c) => directed(t % DIRECTED_TICKS, c) },
   { name: 'sextantes', about: 'prueba: la muestra alta (patas largas, sombra degradada, respiración suave), y después el Clawd de hoy', at: trial },
   { name: 'caminata', about: 'trabajando: camina de tres cuartos, gira, se detiene a bailar o cocinar (8 cuadros por segundo)', at: walking },

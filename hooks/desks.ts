@@ -356,7 +356,7 @@ function sextant(mask: number): string {
 // commoner one behind a glyph of the other; a cell with empty pixels is a
 // glyph alone, in its rarest color. With `eyes`, a cell with an eye in it is
 // that glyph instead, dark on the body: a smile or a shut eye
-const EYE_GLYPH: Record<Eyes, string> = { joy: '^', shut: '▁' }
+const EYE_GLYPH: Record<Eyes, string> = { joy: '^', shut: '▁', dizzy: '@' }
 // The body blended into its shade, a quarter, a half and three quarters of
 // the way: 1, 2, 3. A cell filled with one of them is a shade glyph of the
 // two colors; anywhere else the pixel falls back to the nearer color

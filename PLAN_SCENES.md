@@ -221,6 +221,34 @@ Dibujados en el taller ("festejo 2" y "dormir") y retocados por la persona.
 - El confeti es de píxeles en las celdas libres de los costados; ya no cae
   lejos a la derecha.
 
+## Lote 3: momentos, baile y cocina (hecho en 0.22.0)
+
+Dibujados y pulidos en el taller, ya en 12 filas con sus celdas en cuartos.
+
+| Escena | Dibujos |
+| --- | --- |
+| cool | levanta el brazo, los lentes entran desde su lado, medio giro y pose de tres cuartos golpeando la pata |
+| amor | respira hondo con los ojos cerrados, sonríe y un corazón de píxeles late a su lado |
+| idea | ampolleta apagada, mira arriba, se prende, brazos arriba y rayos que van y vienen |
+| magia | de tres cuartos, varita arriba, la punta brilla, la agita y salen chispas |
+| súper | medio giro, capa sobre el costado en sombra, puño arriba, vuela en diagonal y aterriza |
+| mareo | se sobresalta, se tambalea con ojos `@ @` y estrellas, cae patas arriba, se levanta y se sacude |
+| baile | brazos arriba y abajo alternando patas, un salto y un giro por los tres cuartos |
+| cocina | de tres cuartos con sartén plana: la levanta, el código salta y cae, vapor arriba |
+
+- Cada momento dura lo que duraba (`MOMENT_TICKS`) y dice las mismas líneas,
+  en los mismos ticks.
+- El baile dura 16 ticks y la cocina 8: una parada (`STOP_TICKS`, 16) es un
+  baile o dos tiradas. El salto, el giro y el código en el aire son `busy`:
+  la escena cede un tick después de que terminan, para que se vea el
+  aterrizaje. Entre pasos cede de inmediato.
+- Los ojos mareados son un carácter más, `@`, en la celda del ojo.
+- Lo que ya no se dibuja en estas escenas: las marcas de caracteres (el
+  corazón `♥`, la ampolleta `●`, las chispas, las estrellas, la comida en la
+  sartén) y el gorro, que ninguna pose en píxeles lleva todavía.
+- Los cuadros viejos de celdas siguen en `clawd.ts` para los escritorios de
+  los subagentes y para `view()`.
+
 ## Grillas por celda (0.20.x)
 
 Una celda de terminal es un carácter con dos colores, pero cada celda puede

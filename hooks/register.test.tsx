@@ -180,10 +180,10 @@ test('a thank-you in the prompt raises a heart', async ($, on) => {
   on('prompt.submit', ($, e) => ({ text: e.text }))
   await start($)
   await $.prompt.submit({ text: 'gracias!', wait: false, origin: { kind: 'composer' } })
-  // Clawd raises its arm first; the heart follows
-  expect(await shows($, /♥/)).toBe(false)
+  // A deep breath first; then the heart, drawn in pixels beside it, and its line
+  expect(await shows($, /de nada/)).toBe(false)
   await e.ticks(6)
-  expect(await shows($, /♥/)).toBe(true)
+  expect(await shows($, /de nada/)).toBe(true)
 })
 
 test('tests that pass put on the sunglasses; tests that fail do not', async ($, on) => {

@@ -3,8 +3,8 @@
 Clawd, the Claude Code mascot, above the prompt. It reacts to what Claude is doing:
 
 - **quieto**: waits, blinks and sways.
-- **baila**: dances while a turn runs.
-- **cocina**: tosses code in a pan ("cocinando código").
+- **baila**: stopped at work, dances: arms up and down, a hop and a spin.
+- **cocina**: tosses code in a pan ("cocinando código"), lifting it for the throw.
 - **fuma**: takes a smoke break now and then when idle.
 - **duerme**: falls asleep after 3 minutes idle: eyes shut, breathing slow, a Z rising.
 - **celebra**: when a turn ends, leaps across smiling, turns in the air to land front-on with its arms up, then leaps back, with confetti at its sides.

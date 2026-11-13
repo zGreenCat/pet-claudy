@@ -3,7 +3,26 @@
 // changed and the tests can drive it.
 
 import type { Mark } from './desks'
-import { CHEER, COFFEE, HALF_TURN as TURN, IDLE as WAITING, MUSIC, READ, SLEEP, SMOKE, WALK, shotAt } from './poses.ts'
+import {
+  CHEER,
+  COFFEE,
+  COOK as COOKING,
+  COOL,
+  DANCE as DANCING,
+  DIZZY,
+  HALF_TURN as TURN,
+  IDEA,
+  IDLE as WAITING,
+  LOVE,
+  MAGIC,
+  MUSIC,
+  READ,
+  SLEEP,
+  SMOKE,
+  SUPER,
+  WALK,
+  shotAt,
+} from './poses.ts'
 import type { Eyes, GridCell, Shot } from './poses.ts'
 
 export const TICK_MS = 250
@@ -481,6 +500,9 @@ function dancing(s: number): Pose {
   return { ...pose, line: line + dots }
 }
 
+// What Clawd does stopped at work, `s` ticks into its stops: the dance, or the pan
+const stopped = (s: number) => (isCookingAt(s) ? COOKING : DANCING)
+
 function isCookingAt(s: number): boolean {
   return WORKING_LINES[Math.floor(s / 24) % WORKING_LINES.length]!.startsWith('cocinando')
 }
@@ -508,7 +530,11 @@ function round(s: number): Round {
 // half tick, the rest goes by whole ticks
 function working(s: number, half = 0): Pose {
   const r = round(s)
-  if (r.phase === 'stop') return dancing(r.danced)
+  // Stopped, the dance or the pan as drawn in the workshop; the cells' own stand in at the desks
+  if (r.phase === 'stop') {
+    const { frame, line } = dancing(r.danced)
+    return drawn(stopped(r.danced), line, frame)(r.danced)
+  }
   const { line } = dancing(r.danced)
   if (r.phase === 'turn') return { frame: IDLE, marks: [], line, turning: r.turn }
   const stride = WALK[(s * 2 + half) % WALK.length]!
@@ -647,8 +673,17 @@ function putAway(line: string): Scene['exit'] {
   }
 }
 
+// A moment as drawn in the workshop, its line as the cells say it
+const MOMENT_SHOTS: Record<Mood, readonly Shot[]> = { cool: COOL, love: LOVE, idea: IDEA, magic: MAGIC, super: SUPER, dizzy: DIZZY }
 function momentScene(mood: Mood): Scene {
-  return { place: 'stand', length: MOMENT_TICKS[mood], play: s => moment({ mood, since: s }) }
+  return {
+    place: 'stand',
+    length: MOMENT_TICKS[mood],
+    play: s => {
+      const { frame, line } = moment({ mood, since: s })
+      return drawn(MOMENT_SHOTS[mood], line, frame)(s)
+    },
+  }
 }
 
 export const SCENES: Record<SceneId, Scene> = {
@@ -675,13 +710,13 @@ export const SCENES: Record<SceneId, Scene> = {
     place: 'walk',
     placeAt: s => (round(s).phase === 'walk' ? 'walk' : 'stand'),
     minTicks: 4,
-    // Walking, at the end of a step; stopped, the food back in the pan or the
-    // dance back on both feet
+    // Walking, at the end of a step; stopped, a tick after a hop, a spin or
+    // a toss is over, so the landing shows
     canLeave: s => {
       const r = round(s)
       if (r.phase === 'walk') return s % 2 === 0
       if (r.phase === 'turn') return true
-      return isCookingAt(r.danced) ? r.danced % TOSS.length === 0 : r.danced % DANCE.length === 0
+      return !shotAt(stopped(r.danced), r.danced).busy && !shotAt(stopped(r.danced), Math.max(0, r.danced - 1)).busy
     },
     play: working,
   },

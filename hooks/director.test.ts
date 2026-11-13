@@ -4,6 +4,8 @@ import { CELEBRATE_TICKS, HALF_TURN, MOMENT_TICKS, READING_LINGER_TICKS, STOP_TI
 import type { Context, View } from './clawd'
 import { STALE_TICKS, cue, pose, reset, start, step } from './director'
 import type { Director } from './director'
+import { COOK, DANCE, mirroredCells } from './poses'
+import type { GridCell, Shot } from './poses'
 
 const WORKING: Context = { idleTicks: 0, isWorking: true }
 const IDLE: Context = { idleTicks: 0, isWorking: false }
@@ -19,38 +21,55 @@ function play(d: Director, from: number, to: number, ctx: (t: number) => Context
   return { d, shown }
 }
 
-// The row of the food in the pan, if Clawd is cooking
-const food = (v: View) => v.marks.find(m => /^[{(<[]/.test(m.text))?.row
+// Which shot of a loop a view shows, facing either way
+const drawing = (px: readonly string[] | undefined, cells: readonly GridCell[] | undefined) =>
+  `${px?.join()}#${JSON.stringify([...(cells ?? [])].sort((a, b) => a.y - b.y || a.x - b.x))}`
+const shotOf = (shots: readonly Shot[], v: View) =>
+  shots.findIndex(shot => {
+    const shown = drawing(v.quarters, v.cells)
+    return shown === drawing(shot.px, shot.cells) || shown === drawing(mirrored(shot.px), mirroredCells(shot.cells ?? []))
+  })
 // The first tick from `from` on whose view passes `ok`
 const first = (shown: View[], from: number, ok: (v: View) => boolean) => shown.findIndex((v, t) => t >= from && !!v && ok(v))
-// Working in place, front-on: the dance, or a turn into it
-const isDancing = (v: View) => v.quarters === undefined && /^(pensando|trabajando|bailando)/.test(v.line)
+// Working in place: a shot of the dance, under one of its lines
+const isDancing = (v: View) => shotOf(DANCE, v) >= 0 && /^(pensando|trabajando|bailando)/.test(v.line)
 
-test('cooking, a moment waits for the food to land in the pan', () => {
-  // Work stops to cook some rounds in: find a tick with the food in the air
+test('cooking, a moment waits for the code to land in the pan', () => {
+  // Work stops to cook some rounds in: find a tick with the code in the air
   const { shown: before } = play(start(0), 0, 600, () => WORKING)
-  const tossing = first(before, 0, v => v.line.startsWith('cocinando') && food(v) !== undefined && food(v) !== 2)
+  const tossing = first(before, 0, v => v.line.startsWith('cocinando') && COOK[shotOf(COOK, v)]?.busy === true)
   expect(tossing).toBeGreaterThan(0)
   let { d } = play(start(0), 0, tossing, () => WORKING)
   d = cue(d, 'cool', tossing)
   const { shown } = play(d, tossing + 1, tossing + 20, () => WORKING)
-  // The moment begins right after a tick with the food back in the pan
+  // The moment begins once the code is back in the pan, not before
   const begins = first(shown, tossing + 1, v => v.line === 'momento…')
   expect(begins).toBeGreaterThan(tossing + 1)
+  for (let t = tossing + 1; t < begins - 1; t++) expect(COOK[shotOf(COOK, shown[t]!)]?.busy).toBe(true)
   expect(shown[begins - 1]!.line).toMatch(/^cocinando/)
-  expect(food(shown[begins - 1]!)).toBe(2)
+  expect(COOK[shotOf(COOK, shown[begins - 1]!)]?.busy).toBeUndefined()
 })
 
-test('a turn that ends mid-dance lets the dance finish its turn before the cheer', () => {
-  // Work stops to dance after its first walk and turn: two ticks into the dance
+test('a turn that ends mid-hop lets the dance land and spin before the cheer', () => {
+  // Work stops to dance after its first walk and turn: six ticks in, it hops
+  const hopping = WALK_TICKS + 1 + 6
+  let { d, shown } = play(start(0), 0, hopping, () => WORKING)
+  expect(DANCE[shotOf(DANCE, shown[hopping]!)]?.busy).toBe(true)
+  d = cue(d, 'celebrate', hopping)
+  ;({ d, shown } = play(d, hopping + 1, hopping + 10, () => IDLE))
+  // The hop and the spin after it take six ticks, and it lands for one: then the cheer
+  expect(shown[hopping + 6]!.line).toMatch(/^pensando/)
+  expect(DANCE[shotOf(DANCE, shown[hopping + 6]!)]?.busy).toBeUndefined()
+  expect(shown[hopping + 7]!.line).toBe('¡listo!')
+})
+
+test('a turn that ends between steps of the dance cheers at once', () => {
   const dancing = WALK_TICKS + 1 + 2
   let { d, shown } = play(start(0), 0, dancing, () => WORKING)
   expect(isDancing(shown[dancing]!)).toBe(true)
   d = cue(d, 'celebrate', dancing)
-  ;({ d, shown } = play(d, dancing + 1, dancing + 10, () => IDLE))
-  // The dance comes back to both feet every 6 ticks: four more, then the cheer
-  expect(shown[dancing + 3]!.line).toMatch(/^pensando/)
-  expect(shown[dancing + 4]!.line).toBe('¡listo!')
+  ;({ shown } = play(d, dancing + 1, dancing + 4, () => IDLE))
+  expect(shown[dancing + 1]!.line).toBe('¡listo!')
 })
 
 test('after a moment, work picks up where it left off', () => {
@@ -63,9 +82,9 @@ test('after a moment, work picks up where it left off', () => {
   const begins = first(shown, at + 1, v => v.line === 'mmm…')
   const ends = first(shown, begins, v => !['mmm…', '¡oh!', '¡idea!'].includes(v.line))
   expect(ends - begins).toBe(MOMENT_TICKS.idea)
-  // Back on the same line, dancing on from the step it stopped at
+  // Back on the same line, dancing on
   expect(shown[ends]!.line).toMatch(/^trabajando/)
-  expect(shown[ends]!.frame).toEqual(shown[begins - 1]!.frame)
+  expect(isDancing(shown[ends]!)).toBe(true)
 })
 
 test('work interrupted often still gets to cook', () => {

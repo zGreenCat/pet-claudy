@@ -1,18 +1,26 @@
 import { test, expect } from 'claude-code/testing'
 
-import { CELEBRATE_TICKS, SCENES, mirrored } from './clawd'
+import { CELEBRATE_TICKS, MOMENT_TICKS, SCENES, STOP_TICKS, mirrored } from './clawd'
 import type { Context, View } from './clawd'
 import { solo } from './desks'
 import { cue, pose, start, step } from './director'
 import {
   CHEER,
   COFFEE,
+  COOK,
+  COOL,
+  DANCE,
+  DIZZY,
   HALF_TURN,
+  IDEA,
   IDLE,
+  LOVE,
+  MAGIC,
   MUSIC,
   READ,
   SLEEP,
   SMOKE,
+  SUPER,
   TALL_HALF_TURN,
   TALL_IDLE,
   TALL_WALK,
@@ -34,6 +42,14 @@ const ALL: [string, readonly Shot[]][] = [
   ['smoke', SMOKE],
   ['cheer', CHEER],
   ['sleep', SLEEP],
+  ['cool', COOL],
+  ['love', LOVE],
+  ['idea', IDEA],
+  ['magic', MAGIC],
+  ['super', SUPER],
+  ['dizzy', DIZZY],
+  ['dance', DANCE],
+  ['cook', COOK],
 ]
 
 test('every drawing is the workshop size, in known colors, and fits the terminal cells', () => {
@@ -285,4 +301,32 @@ test('waiting, Clawd breathes in and out an eighth of a cell a tick, its body st
     expect(shot.px).toEqual(IDLE[0]!.px)
     expect(shot.ticks).toBe(1)
   }
+})
+
+test('each moment is drawn for as long as it lasts, and shows through the director', () => {
+  const drawn = { cool: COOL, love: LOVE, idea: IDEA, magic: MAGIC, super: SUPER, dizzy: DIZZY } as const
+  for (const [mood, shots] of Object.entries(drawn) as [keyof typeof drawn, readonly Shot[]][]) {
+    expect([mood, loopTicks(shots)]).toEqual([mood, MOMENT_TICKS[mood]])
+    const working: Context = { idleTicks: 0, isWorking: true }
+    let d = cue(start(0), mood, 0)
+    for (let t = 0; t < MOMENT_TICKS[mood]; t++) {
+      d = step(d, working, t)
+      const v = pose(d, working, t, 80)
+      expect([mood, t, v.quarters]).toEqual([mood, t, shotAt(shots, t).px])
+      expect([mood, t, v.marks]).toEqual([mood, t, []])
+    }
+  }
+})
+
+test('dizzy, its eyes spin as glyphs; stopped at work, the dance and the pan fit its stops', () => {
+  const spinning = DIZZY.find(shot => shot.eyes === 'dizzy')!
+  const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 2, '', false, 80, undefined, spinning.px, 'dizzy', spinning.cells)
+  expect(rows.map(row => row.map(seg => seg.text).join('')).join('').split('@').length - 1).toBe(2)
+  // A stop is one dance or two tosses, and neither can be left mid-air
+  expect(STOP_TICKS % loopTicks(DANCE)).toBe(0)
+  expect(STOP_TICKS % loopTicks(COOK)).toBe(0)
+  expect(DANCE.some(shot => shot.busy)).toBe(true)
+  expect(COOK.filter(shot => shot.busy).length).toBe(3)
+  expect(COOK[0]!.busy).toBeUndefined()
+  expect(COOK.at(-1)!.busy).toBeUndefined()
 })
