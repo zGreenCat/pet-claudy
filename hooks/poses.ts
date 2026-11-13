@@ -198,36 +198,50 @@ export const HALF_TURN: Shot = {
 }
 
 // Waiting: breathing, an uneven blink, and now and then a half turn to look
-// to the side and back
+// to the side and back. A breath is its top edge rising by eighths of a cell
+// in the row of air over it, up to the drawing that has breathed in, and
+// back down: the body itself does not change on the way
+const STILL: Shot = {
+  ticks: 8,
+  px: [
+    '........................',
+    '........................',
+    '........................',
+    '......OO..OOOO..OO......',
+    '......OO..OOOO..OO......',
+    '......OO..OOOO..OO......',
+    '......OOOOOOOOOOOO......',
+    '......OOOOOOOOOOOO......',
+    '......OOOOOOOOOOOO......',
+    '........................',
+    '........................',
+    '........................',
+  ],
+  cells: [
+    { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
+    { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
+    { x: 2, y: 2, grid: 'quarters', px: ['OO', '..'] },
+    { x: 9, y: 2, grid: 'quarters', px: ['OO', '..'] },
+    { x: 3, y: 3, grid: 'quarters', px: ['O.', '..'] },
+    { x: 4, y: 3, grid: 'quarters', px: ['O.', '..'] },
+    { x: 7, y: 3, grid: 'quarters', px: ['.O', '..'] },
+    { x: 8, y: 3, grid: 'quarters', px: ['.O', '..'] },
+  ],
+}
+const breath = (level: number): Shot => ({
+  ticks: 1,
+  px: STILL.px,
+  cells: [
+    ...(STILL.cells ?? []),
+    ...[3, 4, 5, 6, 7, 8].map((x): GridCell => ({ x, y: 0, grid: 'eighths', from: 'bottom', level, color: 'O' })),
+  ],
+})
+const BREATH_IN = [1, 2, 3].map(breath)
+const BREATH_OUT = [3, 2, 1].map(breath)
 export const IDLE: readonly Shot[] = [
   // quieto
-  {
-    ticks: 8,
-    px: [
-      '........................',
-      '........................',
-      '........................',
-      '......OO..OOOO..OO......',
-      '......OO..OOOO..OO......',
-      '......OO..OOOO..OO......',
-      '......OOOOOOOOOOOO......',
-      '......OOOOOOOOOOOO......',
-      '......OOOOOOOOOOOO......',
-      '........................',
-      '........................',
-      '........................',
-    ],
-    cells: [
-      { x: 4, y: 1, grid: 'quarters', px: ['OO', 'KO'] },
-      { x: 7, y: 1, grid: 'quarters', px: ['OO', 'OK'] },
-      { x: 2, y: 2, grid: 'quarters', px: ['OO', '..'] },
-      { x: 9, y: 2, grid: 'quarters', px: ['OO', '..'] },
-      { x: 3, y: 3, grid: 'quarters', px: ['O.', '..'] },
-      { x: 4, y: 3, grid: 'quarters', px: ['O.', '..'] },
-      { x: 7, y: 3, grid: 'quarters', px: ['.O', '..'] },
-      { x: 8, y: 3, grid: 'quarters', px: ['.O', '..'] },
-    ],
-  },
+  { ...STILL, ticks: 5 },
+  ...BREATH_IN,
   // inhala
   {
     ticks: 4,
@@ -262,9 +276,10 @@ export const IDLE: readonly Shot[] = [
       { x: 8, y: 3, grid: 'quarters', px: ['.O', '..'] },
     ],
   },
+  ...BREATH_OUT,
   // quieto
   {
-    ticks: 6,
+    ticks: 3,
     px: [
       '........................',
       '........................',
@@ -318,7 +333,7 @@ export const IDLE: readonly Shot[] = [
   },
   // quieto
   {
-    ticks: 10,
+    ticks: 4,
     px: [
       '........................',
       '........................',
@@ -344,6 +359,7 @@ export const IDLE: readonly Shot[] = [
       { x: 8, y: 3, grid: 'quarters', px: ['.O', '..'] },
     ],
   },
+  ...BREATH_IN,
   // inhala
   {
     ticks: 4,
@@ -382,6 +398,7 @@ export const IDLE: readonly Shot[] = [
       { x: 8, y: 3, grid: 'quarters', px: ['.O', '..'] },
     ],
   },
+  ...BREATH_OUT,
   // medio giro
   {
     ticks: 1,

@@ -54,8 +54,11 @@ test('every drawing is the workshop size, in known colors, and fits the terminal
       }
       const places = new Set<string>()
       for (const cell of cells) {
-        expect([name, cell.grid]).toEqual([name, 'quarters'])
-        if (cell.grid !== 'quarters') continue
+        // An edge in eighths is one color over nothing: it always fits
+        if (cell.grid === 'eighths') {
+          expect([name, cell.level >= 1 && cell.level <= 7, COLORS.has(cell.color)]).toEqual([name, true, true])
+          continue
+        }
         expect([name, cell.px.map(row => row.length)]).toEqual([name, [2, 2]])
         expect([name, cell.x, cell.y, fits([...cell.px.join('')])]).toEqual([name, cell.x, cell.y, true])
         // One grid to a cell, and nothing drawn under it
@@ -270,4 +273,16 @@ test('an edge in eighths turns with the drawing, and its ends are a plain cell',
   expect(cell(2, 'O')?.style).toEqual({ fg: '#F2F2F2', bg: 'claude' })
   expect(cell(8)?.style.bg).toBe('#F2F2F2')
   expect(cell(0)).toBeUndefined()
+})
+
+test('waiting, Clawd breathes in and out an eighth of a cell a tick, its body still on the way', () => {
+  const level = (shot: Shot) => shot.cells?.find(cell => cell.grid === 'eighths')
+  const levels = IDLE.map(shot => { const cell = level(shot); return cell?.grid === 'eighths' ? cell.level : 0 })
+  // Twice a loop: up to the drawing that has breathed in, which holds, and back down
+  expect(levels.join('')).toContain('1230321')
+  expect(levels.filter(n => n === 3).length).toBe(4)
+  for (const shot of IDLE.filter(level)) {
+    expect(shot.px).toEqual(IDLE[0]!.px)
+    expect(shot.ticks).toBe(1)
+  }
 })

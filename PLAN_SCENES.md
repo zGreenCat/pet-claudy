@@ -245,6 +245,9 @@ grilla propia, pintadas encima.
   confeti, capa.
 - Los octantes (2×4) y las imágenes reales no pasan por herdr; los triángulos
   `◢◣◤◥` no llenan la celda. Las cuñas finas sí se dibujan bien: pendientes.
+- El reposo respira de a octavos (0.21.0): el borde de arriba del cuerpo sube
+  1/8, 2/8 y 3/8 en la fila de aire, llega al dibujo que ya inhaló (media
+  celda, los ojos arriba) y baja igual. El bucle sigue durando 52 ticks.
 - `TALL_WALK`, `TALL_HALF_TURN` y `TALL_IDLE` son una muestra que ninguna
   escena usa: patas de 2/3, panza en sombra, costado degradado y respiración
   de a octavos. Se ve con `node scripts/preview.ts sextantes`.
