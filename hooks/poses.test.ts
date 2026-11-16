@@ -322,7 +322,7 @@ test('dizzy, its eyes spin as glyphs; stopped at work, the dance and the pan fit
   const spinning = DIZZY.find(shot => shot.eyes === 'dizzy')!
   const rows = solo(['.OLOORO.', '^OOOOOO^', '.aa..bb.'], [], 2, '', false, 80, undefined, spinning.px, 'dizzy', spinning.cells)
   expect(rows.map(row => row.map(seg => seg.text).join('')).join('').split('@').length - 1).toBe(2)
-  // A stop is one dance or two tosses, and neither can be left mid-air
+  // A stop is one dance or one turn at the pan, and neither can be left mid-air
   expect(STOP_TICKS % loopTicks(DANCE)).toBe(0)
   expect(STOP_TICKS % loopTicks(COOK)).toBe(0)
   expect(DANCE.some(shot => shot.busy)).toBe(true)

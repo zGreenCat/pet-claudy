@@ -227,19 +227,20 @@ Dibujados y pulidos en el taller, ya en 12 filas con sus celdas en cuartos.
 
 | Escena | Dibujos |
 | --- | --- |
-| cool | levanta el brazo, los lentes entran desde su lado, medio giro y pose de tres cuartos golpeando la pata |
+| cool | levanta el brazo, ya tiene los lentes puestos, medio giro y pose de tres cuartos golpeando la pata |
 | amor | respira hondo con los ojos cerrados, sonríe y un corazón de píxeles late a su lado |
-| idea | ampolleta apagada, mira arriba, se prende, brazos arriba y rayos que van y vienen |
+| idea | se agacha a pensar, levanta una ceja (un borde en octavos sobre un ojo), apunta con la mano en sombra a la ampolleta apagada, se prende, brazos arriba y rayos que van y vienen |
 | magia | de tres cuartos, varita arriba, la punta brilla, la agita y salen chispas |
-| súper | medio giro, capa sobre el costado en sombra, puño arriba, vuela en diagonal y aterriza |
+| súper | de frente, capa desde los brazos: se agacha con los ojos apretados, despega estirándose y flota en su lugar levantando una ceja y la otra, con los lados y el borde de la capa meciéndose en octavos; aterriza |
 | mareo | se sobresalta, se tambalea con ojos `@ @` y estrellas, cae patas arriba, se levanta y se sacude |
 | baile | brazos arriba y abajo alternando patas, un salto y un giro por los tres cuartos |
-| cocina | de tres cuartos con sartén plana: la levanta, el código salta y cae, vapor arriba |
+| cocina | de tres cuartos con sartén plana: el código salta bajito sobre ella, luego la levanta para una tirada alta, vapor arriba |
 
-- Cada momento dura lo que duraba (`MOMENT_TICKS`) y dice las mismas líneas,
-  en los mismos ticks.
-- El baile dura 16 ticks y la cocina 8: una parada (`STOP_TICKS`, 16) es un
-  baile o dos tiradas. El salto, el giro y el código en el aire son `busy`:
+- Cada momento dice las mismas líneas de antes. En 0.23.0 se redibujaron
+  cool, idea, súper y cocina desde el taller: cool dura 22 ticks (antes 24)
+  e idea 20 (antes 16), con sus líneas al ritmo del dibujo nuevo.
+- El baile y la cocina duran 16 ticks: una parada (`STOP_TICKS`, 16) es un
+  baile o una vuelta entera de la sartén. El salto, el giro y el código en el aire son `busy`:
   la escena cede un tick después de que terminan, para que se vea el
   aterrizaje. Entre pasos cede de inmediato.
 - Los ojos mareados son un carácter más, `@`, en la celda del ojo.

@@ -273,7 +273,7 @@ function smoking(t: number): { frame: Frame; marks: Mark[] } {
 // It shows for a few seconds over whatever Clawd was doing, then lets go
 export type Mood = 'cool' | 'love' | 'idea' | 'magic' | 'super' | 'dizzy'
 export type Moment = { mood: Mood; since: number }
-export const MOMENT_TICKS: Record<Mood, number> = { cool: 24, love: 20, idea: 16, magic: 16, super: 24, dizzy: 32 }
+export const MOMENT_TICKS: Record<Mood, number> = { cool: 22, love: 20, idea: 20, magic: 16, super: 24, dizzy: 32 }
 const HEART = '#E5484D'
 const BULB = '#F2C14E'
 // A wooden wand with a white tip
@@ -333,7 +333,7 @@ function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string; dx?: nu
       // An arm lifts a little, sweeps down over the face, and the glasses are
       // on; then it taps a foot
       if (s < 3) return { frame: [HEAD_ARM_LIFTED, BODY_ARM_LIFTED, LEGS], marks: [], line: 'momento…' }
-      if (s < 5) return { frame: [HEAD_COOL_SWEEP, BODY_COOL_SWEEP, LEGS], marks: [], line: 'momento…' }
+      if (s < 5) return { frame: [HEAD_COOL_SWEEP, BODY_COOL_SWEEP, LEGS], marks: [], line: 'todo en verde' }
       return { frame: [HEAD_COOL, BODY_COOL, s % 8 < 4 ? LEGS : LEGS_TAP], marks: [], line: 'todo en verde' }
     case 'love': {
       // It stays put: a deep breath with its eyes shut, then eyes squeezed
@@ -346,13 +346,14 @@ function moment(m: Moment): { frame: Frame; marks: Mark[]; line: string; dx?: nu
     }
     case 'idea': {
       // The bulb shows up dim; it looks up at it and the bulb lights; then it
-      // looks ahead with its eyes wide at the thought, the rays coming and going
-      const isLit = s >= 4
+      // looks ahead with its eyes wide at the thought, the rays coming and going.
+      // The lines keep time with the drawing: lit at 6, the idea at 10
+      const isLit = s >= 6
       const bulb: Mark = { row: 0, x: 4, text: '●', fg: isLit ? BULB : BULB_OFF }
-      const rays: Mark[] = s >= 6 && (s - 6) % 4 < 2 ? [{ row: 0, x: 3, text: '\\', fg: BULB }, { row: 0, x: 5, text: '/', fg: BULB }] : []
+      const rays: Mark[] = s >= 10 && (s - 10) % 4 < 2 ? [{ row: 0, x: 3, text: '\\', fg: BULB }, { row: 0, x: 5, text: '/', fg: BULB }] : []
       if (s < 2) return { frame: IDLE, marks: [bulb], line: 'mmm…' }
-      if (s < 6) return { frame: [HEAD_LOOK_UP, BODY, LEGS], marks: [bulb], line: isLit ? '¡oh!' : 'mmm…' }
-      return { frame: [s < 10 ? HEAD_WIDE : HEAD, BODY, LEGS], marks: [bulb, ...rays], line: '¡idea!' }
+      if (s < 10) return { frame: [HEAD_LOOK_UP, BODY, LEGS], marks: [bulb], line: isLit ? '¡oh!' : 'mmm…' }
+      return { frame: [s < 14 ? HEAD_WIDE : HEAD, BODY, LEGS], marks: [bulb, ...rays], line: '¡idea!' }
     }
     case 'magic': {
       // An arm lifts the wand, its tip glints; a flick down, eyes squeezed,
@@ -490,9 +491,9 @@ export function isSmoking(idleTicks: number): boolean {
 }
 
 // Working, `s` ticks into dancing: the line changing every six seconds, and
-// one line in four cooking code in a pan. 24 ticks is three tosses and four
-// turns of the dance, so each line ends with the food in the pan or the feet
-// together
+// one line in four cooking code in a pan. 24 ticks is a turn and a half of the
+// dance or the pan, so each line ends with the feet together or the food low
+// over the pan
 function dancing(s: number): Pose {
   const line = WORKING_LINES[Math.floor(s / 24) % WORKING_LINES.length]!
   const pose = isCookingAt(s) ? cooking(s) : { frame: DANCE[s % DANCE.length]!, marks: [] }

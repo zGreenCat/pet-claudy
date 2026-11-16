@@ -187,10 +187,10 @@ test('a moment shows over work for a few seconds, then lets go', () => {
   const bulb = (since: number) => at('idea', since).marks.find(m => m.text === '●')!
   expect(at('idea', 0).frame[0]).toBe('.OLOORO.')
   expect(at('idea', 2).frame[0]).toBe('.OpOOpO.')
-  expect(bulb(2).fg).not.toBe(bulb(4).fg)
-  expect(at('idea', 6).frame[0]).toBe('.OwOOwO.')
-  expect(at('idea', 6).marks.map(m => m.text).join('')).toContain('\\')
-  expect(at('idea', 12).frame[0]).toBe('.OLOORO.')
+  expect(bulb(2).fg).not.toBe(bulb(6).fg)
+  expect(at('idea', 10).frame[0]).toBe('.OwOOwO.')
+  expect(at('idea', 10).marks.map(m => m.text).join('')).toContain('\\')
+  expect(at('idea', 16).frame[0]).toBe('.OLOORO.')
 })
 
 test('thanks, passing tests, commits and fresh plans earn a moment', () => {
